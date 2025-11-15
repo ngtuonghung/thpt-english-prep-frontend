@@ -21,7 +21,7 @@ exports.handler = async (event) => {
         // Xác định origin hợp lệ
         const frontendUrl = (origin && allowedOrigins.includes(origin))
             ? origin
-            : 'http://localhost:5174';
+            : 'https://dircuy355yl78.cloudfront.net';
         
         console.log('Using frontend URL:', frontendUrl);
         
