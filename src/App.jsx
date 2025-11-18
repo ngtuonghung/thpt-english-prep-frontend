@@ -2,6 +2,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import './App.css'
 import Notification from './components/Notification'
+import Exam from './pages/Exam'
 
 // API and Cognito config
 const API_BASE = 'https://hrj5qc8u76.execute-api.ap-southeast-1.amazonaws.com/prod'
@@ -76,6 +77,7 @@ function CallbackHandler() {
 }
 
 function Dashboard() {
+  const navigate = useNavigate()
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [fetchingUserInfo, setFetchingUserInfo] = useState(true)
@@ -347,10 +349,8 @@ function Dashboard() {
       console.log('Reorder Questions:', body.reorder_questions)
       console.log('===========================')
 
-      setUploadStatus({
-        type: 'success',
-        message: `Exam created successfully! Quiz ID: ${body.quiz_id}`
-      })
+      // Navigate to exam page
+      navigate('/exam')
 
     } catch (error) {
       console.error('Error fetching exam:', error)
@@ -791,6 +791,7 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/callback" element={<CallbackHandler />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/exam" element={<Exam />} />
       </Routes>
     </BrowserRouter>
   )
