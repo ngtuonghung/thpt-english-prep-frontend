@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect, useCallback, useRef } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import './App.css'
+import Notification from './components/Notification'
 
 // API and Cognito config
 const API_BASE = 'https://hrj5qc8u76.execute-api.ap-southeast-1.amazonaws.com/prod'
@@ -30,7 +31,7 @@ function CallbackHandler() {
 
   const exchangeCodeForTokens = async (code) => {
     try {
-      console.log('🔄 Exchanging code for tokens...')
+      console.log('Exchanging code for tokens...')
       console.log('Code:', code)
       console.log('URL:', `${API_BASE}/token?code=${code}`)
 
@@ -45,7 +46,7 @@ function CallbackHandler() {
       console.log('Parsed body:', body)
 
       if (body.access_token) {
-        console.log('✅ Got access token, storing...')
+        console.log('Got access token, storing...')
         // Store the tokens
         const user = {
           access_token: body.access_token,
@@ -56,12 +57,12 @@ function CallbackHandler() {
         localStorage.setItem('user', JSON.stringify(user))
         navigate('/dashboard', { replace: true })
       } else {
-        console.error('❌ No access token received')
+        console.error('No access token received')
         console.error('Body:', body)
         navigate('/', { replace: true })
       }
     } catch (err) {
-      console.error('❌ Token exchange failed:', err)
+      console.error('Token exchange failed:', err)
       navigate('/', { replace: true })
     }
   }
@@ -77,23 +78,30 @@ function CallbackHandler() {
 function Dashboard() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [fetchingUserInfo, setFetchingUserInfo] = useState(true)
   const [userInfo, setUserInfo] = useState(null)
   const [showProfileMenu, setShowProfileMenu] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadStatus, setUploadStatus] = useState(null)
+  const [creatingExam, setCreatingExam] = useState(false)
   const fetchingRef = useRef(false)
   const hasFetchedRef = useRef(false)
   const profileMenuRef = useRef(null)
+  const fileInputRef = useRef(null)
 
   const fetchUserInfo = useCallback(async (accessToken) => {
     // Prevent duplicate fetches
     if (fetchingRef.current || hasFetchedRef.current) {
-      console.log('⏭️ Skipping duplicate fetch request')
+      console.log('Skipping duplicate fetch request')
       return
     }
 
     fetchingRef.current = true
+    setFetchingUserInfo(true)
 
     try {
-      console.log('🔄 Fetching user info...')
+      console.log('Fetching user info...')
       const response = await fetch(`${API_BASE}/user`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`
@@ -111,22 +119,35 @@ function Dashboard() {
       console.log('Is admin?', body.groups?.includes('admin'))
 
       setUserInfo(body)
+      // Save user info to localStorage for future sessions
+      localStorage.setItem('userInfo', JSON.stringify(body))
       hasFetchedRef.current = true
     } catch (err) {
       console.error('Failed to fetch user info:', err)
     } finally {
       fetchingRef.current = false
+      setFetchingUserInfo(false)
     }
   }, [])
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user')
+    const savedUserInfo = localStorage.getItem('userInfo')
+
     if (savedUser) {
       const parsedUser = JSON.parse(savedUser)
       setUser(parsedUser)
 
-      // Fetch user info from API using access token
-      if (parsedUser.access_token) {
+      // Check if we have cached user info
+      if (savedUserInfo) {
+        // Use cached user info
+        const parsedUserInfo = JSON.parse(savedUserInfo)
+        setUserInfo(parsedUserInfo)
+        setFetchingUserInfo(false)
+        hasFetchedRef.current = true
+        console.log('Using cached user info')
+      } else if (parsedUser.access_token) {
+        // Fetch user info from API only if not cached
         fetchUserInfo(parsedUser.access_token)
       }
     }
@@ -152,6 +173,7 @@ function Dashboard() {
 
   const handleLogout = () => {
     localStorage.removeItem('user')
+    localStorage.removeItem('userInfo')
     const logoutUrl = `${COGNITO_DOMAIN}/logout?client_id=${CLIENT_ID}&logout_uri=${encodeURIComponent(window.location.origin)}`
     window.location.href = logoutUrl
   }
@@ -164,7 +186,183 @@ function Dashboard() {
     }
     return name.substring(0, 2).toUpperCase()
   }
-  
+
+  const handleFileSelect = async (event) => {
+    const file = event.target.files[0]
+    if (!file) return
+
+    // Validate file type
+    if (file.type !== 'application/pdf') {
+      setUploadStatus({ type: 'error', message: 'Please select a PDF file' })
+      return
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadStatus({ type: 'error', message: 'File size must be less than 10MB' })
+      return
+    }
+
+    setUploading(true)
+    setUploadProgress(0)
+    setUploadStatus(null)
+
+    try {
+      // Stage 1: Validation (0-10%)
+      console.log('Validating file...')
+      setUploadProgress(10)
+
+      // Stage 2: Base64 conversion (10-30%)
+      console.log('Converting PDF to base64...')
+      const base64 = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const base64String = reader.result.split(',')[1]
+          resolve(base64String)
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+
+      setUploadProgress(30)
+
+      // Stage 3: Uploading to server (30-70%)
+      console.log('Uploading PDF to API...')
+
+      // Use XMLHttpRequest for progress tracking
+      const uploadPromise = new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            const percentComplete = 30 + (e.loaded / e.total) * 40
+            setUploadProgress(Math.round(percentComplete))
+          }
+        })
+
+        xhr.addEventListener('load', () => {
+          // Stage 4: Processing on server (70-100%)
+          setUploadProgress(70)
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const data = JSON.parse(xhr.responseText)
+              resolve({ ok: true, status: xhr.status, data })
+            } catch (e) {
+              reject(new Error('Invalid response format'))
+            }
+          } else {
+            try {
+              const data = JSON.parse(xhr.responseText)
+              resolve({ ok: false, status: xhr.status, data })
+            } catch (e) {
+              reject(new Error(`Upload failed with status ${xhr.status}`))
+            }
+          }
+        })
+
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error occurred'))
+        })
+
+        xhr.addEventListener('abort', () => {
+          reject(new Error('Upload cancelled'))
+        })
+
+        xhr.open('POST', `${API_BASE}/upload`)
+        xhr.setRequestHeader('Content-Type', 'application/json')
+        xhr.setRequestHeader('Authorization', `Bearer ${user.access_token}`)
+        xhr.send(JSON.stringify({ file: base64 }))
+      })
+
+      const response = await uploadPromise
+
+      console.log('Upload response status:', response.status)
+      console.log('Upload response data:', response.data)
+
+      if (response.ok) {
+        // Complete processing stage (70-100%)
+        setUploadProgress(100)
+
+        setUploadStatus({
+          type: 'success',
+          message: `Successfully uploaded! ${response.data.questions || 0} questions extracted.`
+        })
+      } else {
+        setUploadStatus({
+          type: 'error',
+          message: response.data.message || 'Upload failed. Please try again.'
+        })
+      }
+    } catch (error) {
+      console.error('Upload error:', error)
+      setUploadStatus({
+        type: 'error',
+        message: error.message || 'Failed to upload file. Please check your connection and try again.'
+      })
+    } finally {
+      setUploading(false)
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+  }
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleCreateExam = async () => {
+    setCreatingExam(true)
+
+    try {
+      console.log('Fetching exam questions from /exam endpoint...')
+
+      const response = await fetch(`${API_BASE}/exam`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${user.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      console.log('Response status:', response.status)
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const data = await response.json()
+      console.log('Raw response data:', data)
+
+      // Handle both Lambda Proxy (direct response) and non-proxy (wrapped in body)
+      const body = data.body ? (typeof data.body === 'string' ? JSON.parse(data.body) : data.body) : data
+
+      console.log('===== EXAM QUESTIONS =====')
+      console.log('Quiz ID:', body.quiz_id)
+      console.log('Structure:', body.structure)
+      console.log('Fill Short Groups:', body.groups.fill_short)
+      console.log('Fill Long Groups:', body.groups.fill_long)
+      console.log('Reading Groups:', body.groups.reading)
+      console.log('Reorder Questions:', body.reorder_questions)
+      console.log('===========================')
+
+      setUploadStatus({
+        type: 'success',
+        message: `Exam created successfully! Quiz ID: ${body.quiz_id}`
+      })
+
+    } catch (error) {
+      console.error('Error fetching exam:', error)
+      setUploadStatus({
+        type: 'error',
+        message: error.message || 'Failed to create exam. Please try again.'
+      })
+    } finally {
+      setCreatingExam(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="loading">
@@ -328,14 +526,27 @@ function Dashboard() {
                   <p className="action-card-description">Start creating a new exam for your students</p>
                 </div>
               </div>
-              <button className="btn-action-modern" onClick={() => {
-                // API will be added later
-              }}>
-                <span>Get Started</span>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                  <polyline points="12 5 19 12 12 19"></polyline>
-                </svg>
+              <button
+                className="btn-action-modern"
+                onClick={handleCreateExam}
+                disabled={creatingExam}
+              >
+                {creatingExam ? (
+                  <>
+                    <svg className="upload-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                    </svg>
+                    <span>Creating...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Get Started</span>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="5" y1="12" x2="19" y2="12"></line>
+                      <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                  </>
+                )}
               </button>
             </div>
 
@@ -355,20 +566,75 @@ function Dashboard() {
                     <p className="action-card-description">Upload exam materials and resources</p>
                   </div>
                 </div>
-                <button className="btn-action-modern" onClick={() => {
-                  // API will be added later
-                }}>
-                  <span>Upload</span>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                    <polyline points="12 5 19 12 12 19"></polyline>
-                  </svg>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf"
+                  onChange={handleFileSelect}
+                  style={{ display: 'none' }}
+                />
+                {uploading && (
+                  <div className="upload-progress-container">
+                    <div className="upload-progress-bar">
+                      <div
+                        className="upload-progress-fill"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                    <div className="upload-progress-text">
+                      <span>Uploading...</span>
+                      <span className="upload-progress-percent">{uploadProgress}%</span>
+                    </div>
+                  </div>
+                )}
+                <button
+                  className="btn-action-modern"
+                  onClick={handleUploadClick}
+                  disabled={uploading}
+                >
+                  {uploading ? (
+                    <>
+                      <svg className="upload-spinner" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                      </svg>
+                      <span>Processing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Upload</span>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                      </svg>
+                    </>
+                  )}
                 </button>
               </div>
             )}
           </div>
         </div>
       </main>
+
+      {/* Loading overlay when fetching user info */}
+      {fetchingUserInfo && (
+        <div className="loading-overlay">
+          <div className="loading-overlay-content">
+            <div className="spinner"></div>
+            <p>Loading user information...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Notification popup */}
+      {uploadStatus && (
+        <Notification
+          type={uploadStatus.type}
+          message={uploadStatus.message}
+          duration={5000}
+          onClose={() => setUploadStatus(null)}
+          position="top-right"
+        />
+      )}
     </div>
   )
 }
