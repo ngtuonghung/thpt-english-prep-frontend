@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Navigate } from 'react-router-dom'
 import './Exam.css'
 import ConfirmModal from '../components/ConfirmModal'
+import TopBar from '../components/TopBar'
 
 const API_BASE = 'https://hrj5qc8u76.execute-api.ap-southeast-1.amazonaws.com/prod'
 const EXAM_DURATION = 50 * 60 // 50 minutes in seconds
@@ -12,14 +13,12 @@ function Exam() {
   const [examData, setExamData] = useState(null)
   const [error, setError] = useState(null)
   const [userInfo, setUserInfo] = useState(null)
-  const [showProfileMenu, setShowProfileMenu] = useState(false)
   const [answers, setAnswers] = useState({}) // Store user's answers
   const [timeRemaining, setTimeRemaining] = useState(EXAM_DURATION)
   const [examStarted, setExamStarted] = useState(false)
   const [examStartTime, setExamStartTime] = useState(null)
   const [showSubmitModal, setShowSubmitModal] = useState(false)
   const [showExitModal, setShowExitModal] = useState(false)
-  const profileMenuRef = useRef(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -59,23 +58,6 @@ function Exam() {
     return () => clearInterval(timer)
   }, [examStarted, timeRemaining, navigate])
 
-  // Handle click outside to close profile menu
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target)) {
-        setShowProfileMenu(false)
-      }
-    }
-
-    if (showProfileMenu) {
-      document.addEventListener('mousedown', handleClickOutside)
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
-  }, [showProfileMenu])
-
   const fetchExamData = async (accessToken) => {
     try {
       const response = await fetch(`${API_BASE}/exam`, {
@@ -104,24 +86,6 @@ function Exam() {
     }
   }
 
-  const handleLogout = () => {
-    localStorage.removeItem('user')
-    localStorage.removeItem('userInfo')
-    const COGNITO_DOMAIN = 'https://ap-southeast-1dmwikmffs.auth.ap-southeast-1.amazoncognito.com'
-    const CLIENT_ID = '4033t9pc3hhe7r84eq8mi2cnkj'
-    const logoutUrl = `${COGNITO_DOMAIN}/logout?client_id=${CLIENT_ID}&logout_uri=${encodeURIComponent(window.location.origin)}`
-    window.location.href = logoutUrl
-  }
-
-  const getInitials = (name) => {
-    if (!name) return '👤'
-    const parts = name.split(' ')
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
-    }
-    return name.substring(0, 2).toUpperCase()
-  }
-
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
@@ -129,10 +93,19 @@ function Exam() {
   }
 
   const handleAnswerSelect = (questionId, answer) => {
-    setAnswers(prev => ({
-      ...prev,
-      [questionId]: answer
-    }))
+    setAnswers(prev => {
+      // If clicking the same answer, unselect it
+      if (prev[questionId] === answer) {
+        const newAnswers = { ...prev }
+        delete newAnswers[questionId]
+        return newAnswers
+      }
+      // Otherwise, select the new answer
+      return {
+        ...prev,
+        [questionId]: answer
+      }
+    })
   }
 
   const handleSubmitClick = () => {
@@ -246,66 +219,7 @@ function Exam() {
 
   return (
     <div className="exam-page">
-      <header className="dashboard-header">
-        <div className="container">
-          <div className="logo" onClick={handleExitClick} style={{ cursor: 'pointer' }}>
-            📚 THPT English Prep
-          </div>
-          <div className="user-menu" ref={profileMenuRef}>
-            <button
-              className="user-profile-button"
-              onClick={() => setShowProfileMenu(!showProfileMenu)}
-            >
-              <div className="user-avatar">
-                {userInfo?.picture ? (
-                  <img src={userInfo.picture} alt={userInfo.username || 'User'} className="user-avatar-img" />
-                ) : (
-                  <span className="user-avatar-initials">
-                    {getInitials(userInfo?.username || userInfo?.name || userInfo?.email)}
-                  </span>
-                )}
-              </div>
-              <span className="user-name">{userInfo?.username || userInfo?.name || userInfo?.email?.split('@')[0] || 'User'}</span>
-              <svg className={`dropdown-arrow ${showProfileMenu ? 'open' : ''}`} width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </button>
-
-            {showProfileMenu && (
-              <div className="profile-dropdown">
-                <div className="profile-dropdown-header">
-                  <div className="profile-dropdown-avatar">
-                    {userInfo?.picture ? (
-                      <img src={userInfo.picture} alt={userInfo.username || 'User'} className="profile-dropdown-avatar-img" />
-                    ) : (
-                      <span className="profile-dropdown-avatar-initials">
-                        {getInitials(userInfo?.username || userInfo?.name || userInfo?.email)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="profile-dropdown-info">
-                    <h3 className="profile-dropdown-name">{userInfo?.username || userInfo?.name || 'User'}</h3>
-                    <p className="profile-dropdown-email">{userInfo?.email || 'No email'}</p>
-                  </div>
-                </div>
-
-                <div className="profile-dropdown-divider"></div>
-
-                <div className="profile-dropdown-actions">
-                  <button onClick={handleLogout} className="btn-logout-dropdown">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                      <polyline points="16 17 21 12 16 7"></polyline>
-                      <line x1="21" y1="12" x2="9" y2="12"></line>
-                    </svg>
-                    <span>Đăng xuất</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
+      <TopBar userInfo={userInfo} />
 
       <main className="exam-main">
         {error ? (
