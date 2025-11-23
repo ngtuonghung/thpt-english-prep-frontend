@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { useNavigate, Navigate, useLocation } from 'react-router-dom'
+import { useNavigate, Navigate } from 'react-router-dom'
 import './Submission.css'
 import TopBar from '../components/TopBar'
 
@@ -14,7 +14,6 @@ function Submission() {
   const [chatSessions, setChatSessions] = useState({}) // Store chat sessions by question ID
   const [chatInput, setChatInput] = useState('')
   const navigate = useNavigate()
-  const location = useLocation()
   const chatMessagesRef = useRef(null)
 
   const [examData, setExamData] = useState(null)
@@ -28,42 +27,35 @@ function Submission() {
     if (savedUser) {
       const parsedUser = JSON.parse(savedUser)
       setUser(parsedUser)
-
       if (savedUserInfo) {
         setUserInfo(JSON.parse(savedUserInfo))
       }
     }
 
-    const stateData = location.state
-    if (stateData?.examData && stateData?.answers) {
-      console.log('Loading submission from location state')
-      setExamData(stateData.examData)
-      setAnswers(stateData.answers)
-      setExamStartTime(stateData.examStartTime)
-      // Persist to session storage for refresh
-      sessionStorage.setItem('submissionResult', JSON.stringify(stateData))
-      setLoading(false)
-    } else {
-      console.log('Loading submission from session storage')
-      const savedResult = sessionStorage.getItem('submissionResult')
-      if (savedResult) {
+    const savedExam = sessionStorage.getItem('currentExam');
+    const savedAnswers = sessionStorage.getItem('examAnswers');
+    const savedStartTime = sessionStorage.getItem('examStartTime');
+
+    if (savedExam && savedAnswers) {
         try {
-          const parsedResult = JSON.parse(savedResult)
-          setExamData(parsedResult.examData)
-          setAnswers(parsedResult.answers)
-          setExamStartTime(parsedResult.examStartTime)
+            const parsedExam = JSON.parse(savedExam);
+            setExamData(parsedExam.data);
+            setAnswers(JSON.parse(savedAnswers));
+            if (savedStartTime) {
+                setExamStartTime(new Date(savedStartTime));
+            }
         } catch (error) {
-            console.error("Failed to parse submission result from session storage", error)
-            navigate('/dashboard')
+            console.error("Failed to parse exam/answer data from session storage", error);
+            navigate('/dashboard');
+            return;
         }
-      } else {
-        // No data available, redirect
-        navigate('/dashboard')
+    } else {
+        console.warn("No exam data found in session storage for submission page.");
+        navigate('/dashboard');
         return;
-      }
-      setLoading(false)
     }
-  }, [location.state, navigate])
+    setLoading(false)
+  }, [navigate])
 
 
   // Auto-scroll chat messages to bottom
@@ -208,10 +200,10 @@ function Submission() {
 
   // Calculate score based on correct_answer comparison
   const calculateScore = useMemo(() => {
+    if (!answers) return { correct: 0, total: allQuestions.length, percentage: 0 };
+    
     let correct = 0
     const total = allQuestions.length
-    if (!answers) return { correct: 0, total: 0, percentage: 0 };
-
 
     allQuestions.forEach(question => {
       const userAnswer = answers[question.id]
@@ -485,7 +477,6 @@ function Submission() {
     sessionStorage.removeItem('examStartTime');
     sessionStorage.removeItem('examTimeRemaining');
     sessionStorage.removeItem('examStarted');
-    sessionStorage.removeItem('submissionResult');
     navigate('/dashboard');
   };
 

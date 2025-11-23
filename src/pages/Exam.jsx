@@ -344,24 +344,50 @@ function Exam() {
     setShowSubmitModal(true)
   }
 
-  const handleConfirmSubmit = () => {
-    // Log exam ID before clearing storage
-    console.log('=== EXAM SUBMITTED ===')
-    console.log('Exam ID:', examId)
-    console.log('Total answers:', Object.keys(answers).length)
-    console.log('====================')
+  const handleConfirmSubmit = async () => {
+    console.log('=== EXAM SUBMITTING... ===')
+    setShowSubmitModal(false) // Close modal immediately
 
-    // Set flag to allow navigation
-    isNavigatingAway.current = true
+    try {
+      const response = await fetch(`${'https://hrj5qc8u76.execute-api.ap-southeast-1.amazonaws.com/prod'}/submission`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${user.access_token}`,
+        },
+        body: JSON.stringify({
+          examData,
+          answers,
+          examStartTime,
+        }),
+      })
 
-    // Navigate to submission page with exam data and answers
-    navigate('/submission', {
-      state: {
-        examData,
-        answers,
-        examStartTime
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || 'Submission failed on the server')
       }
-    })
+
+      const result = await response.json()
+      console.log('Submission successful:', result)
+
+      // Set flag to allow navigation
+      isNavigatingAway.current = true
+
+      // Navigate to submission page with exam data and answers
+      navigate('/submission', {
+        state: {
+          examData,
+          answers,
+          examStartTime,
+        },
+      })
+    } catch (error) {
+      console.error('Failed to submit exam:', error)
+      setNotification({
+        type: 'error',
+        message: `Lỗi nộp bài: ${error.message}. Vui lòng thử lại.`,
+      })
+    }
   }
 
   const handleExitClick = () => {
@@ -607,6 +633,7 @@ function Exam() {
                     Điền từ ngắn
                   </h2>
                   {examData.groups.fill_short.map((group, groupIdx) => {
+                    console.log(`Group ${group.id} has ${group.subquestions.length} subquestions.`)
                     let questionNum = 0
 
                     // Calculate question number offset
