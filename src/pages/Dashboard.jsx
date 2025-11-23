@@ -244,8 +244,26 @@ export default function Dashboard() {
       console.log('Reorder Questions:', body.reorder_questions)
       console.log('===========================')
 
-      // Navigate to exam page
-      navigate('/exam')
+      // Generate unique exam ID (timestamp-based)
+      const examId = Date.now()
+
+      // Clear any existing exam data from session storage
+      sessionStorage.removeItem('currentExam')
+      sessionStorage.removeItem('examAnswers')
+      sessionStorage.removeItem('examStartTime')
+      sessionStorage.removeItem('examTimeRemaining')
+      sessionStorage.removeItem('examStarted')
+
+      // Save exam data to session storage
+      sessionStorage.setItem('currentExam', JSON.stringify({
+        id: examId,
+        data: body
+      }))
+
+      console.log('Exam created with ID:', examId)
+
+      // Navigate to exam page with exam ID
+      navigate(`/exam?id=${examId}`)
 
     } catch (error) {
       console.error('Error fetching exam:', error)

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-route
 import './App.css'
 import Dashboard from './pages/Dashboard'
 import Exam from './pages/Exam'
+import Submission from './pages/Submission'
 
 // API and Cognito config
 const API_BASE = 'https://hrj5qc8u76.execute-api.ap-southeast-1.amazonaws.com/prod'
@@ -229,6 +230,7 @@ function App() {
         <Route path="/callback" element={<CallbackHandler />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/exam" element={<Exam />} />
+        <Route path="/submission" element={<Submission />} />
       </Routes>
     </BrowserRouter>
   )

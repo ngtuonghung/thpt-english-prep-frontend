@@ -4,7 +4,7 @@ import './UserMenu.css'
 const COGNITO_DOMAIN = 'https://ap-southeast-1dmwikmffs.auth.ap-southeast-1.amazoncognito.com'
 const CLIENT_ID = '4033t9pc3hhe7r84eq8mi2cnkj'
 
-export default function UserMenu({ userInfo }) {
+export default function UserMenu({ userInfo, hideLogout = false }) {
   const [showProfileMenu, setShowProfileMenu] = useState(false)
   const profileMenuRef = useRef(null)
 
@@ -26,8 +26,18 @@ export default function UserMenu({ userInfo }) {
   }, [showProfileMenu])
 
   const handleLogout = () => {
+    // Clear all localStorage
     localStorage.removeItem('user')
     localStorage.removeItem('userInfo')
+
+    // Clear all sessionStorage (exam data)
+    sessionStorage.removeItem('currentExam')
+    sessionStorage.removeItem('examAnswers')
+    sessionStorage.removeItem('examStartTime')
+    sessionStorage.removeItem('examTimeRemaining')
+    sessionStorage.removeItem('examStarted')
+
+    // Redirect to Cognito logout
     const logoutUrl = `${COGNITO_DOMAIN}/logout?client_id=${CLIENT_ID}&logout_uri=${encodeURIComponent(window.location.origin)}`
     window.location.href = logoutUrl
   }
@@ -147,18 +157,22 @@ export default function UserMenu({ userInfo }) {
             )}
           </div>
 
-          <div className="profile-dropdown-divider"></div>
+          {!hideLogout && (
+            <>
+              <div className="profile-dropdown-divider"></div>
 
-          <div className="profile-dropdown-actions">
-            <button onClick={handleLogout} className="btn-logout-dropdown">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                <polyline points="16 17 21 12 16 7"></polyline>
-                <line x1="21" y1="12" x2="9" y2="12"></line>
-              </svg>
-              <span>Đăng xuất</span>
-            </button>
-          </div>
+              <div className="profile-dropdown-actions">
+                <button onClick={handleLogout} className="btn-logout-dropdown">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                    <polyline points="16 17 21 12 16 7"></polyline>
+                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                  </svg>
+                  <span>Đăng xuất</span>
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
