@@ -354,9 +354,6 @@ function Exam() {
     // Set flag to allow navigation
     isNavigatingAway.current = true
 
-    // Clear exam storage
-    clearExamStorage()
-
     // Navigate to submission page with exam data and answers
     navigate('/submission', {
       state: {
@@ -450,11 +447,13 @@ function Exam() {
 
     // Reorder questions (Questions 13-17)
     if (examData.reorder_questions) {
-      examData.reorder_questions.forEach(q => {
-        questions.push({
-          num: questionNum++,
-          id: `reorder-${q.id}`,
-          type: 'reorder'
+      examData.reorder_questions.forEach(group => {
+        group.subquestions.forEach((_, subIdx) => {
+          questions.push({
+            num: questionNum++,
+            id: `reorder-${group.id}-${subIdx}`,
+            type: 'reorder'
+          })
         })
       })
     }
@@ -486,6 +485,16 @@ function Exam() {
     }
 
     return questions
+  }
+
+  const renderMarkdown = (text) => {
+    if (!text) return { __html: '' }
+    const html = text
+      .replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>') // Bold and Italic
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
+      .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italic
+      .replace(/\n/g, '<br />') // New lines
+    return { __html: html }
   }
 
   if (loading) {
@@ -608,7 +617,7 @@ function Exam() {
                     return (
                       <div key={group.id} className="question-group">
                         <div className="group-context">
-                          <p className="context-text">{group.context}</p>
+                          <p className="context-text" dangerouslySetInnerHTML={renderMarkdown(group.context)} />
                         </div>
                         {group.subquestions.map((subq, subIdx) => {
                           const currentQuestionNum = questionNum + subIdx + 1
@@ -619,7 +628,7 @@ function Exam() {
                                 <span className="question-number">Câu {currentQuestionNum}</span>
                               </div>
                               {subq.content && (
-                                <p className="question-text">{subq.content}</p>
+                                <p className="question-text" dangerouslySetInnerHTML={renderMarkdown(subq.content)} />
                               )}
                               <div className="options-list">
                                 {subq.options.map((option, optIdx) => {
@@ -652,8 +661,7 @@ function Exam() {
                     <span className="section-number">Phần 2</span>
                     Sắp xếp câu
                   </h2>
-                  {examData.reorder_questions.map((question, idx) => {
-                    const questionId = `reorder-${question.id}`
+                  {examData.reorder_questions.map((group, groupIdx) => {
                     let questionNum = 0
 
                     // Add fill_short questions
@@ -663,31 +671,50 @@ function Exam() {
                       })
                     }
 
-                    questionNum += idx + 1
+                    // Add previous reorder group questions
+                    for (let i = 0; i < groupIdx; i++) {
+                      questionNum += examData.reorder_questions[i].subquestions.length
+                    }
 
                     return (
-                      <div key={question.id} id={`question-${questionNum}`} className="question-card">
-                        <div className="question-header">
-                          <span className="question-number">Câu {questionNum}</span>
-                        </div>
-                        {question.content && (
-                          <p className="question-text">{question.content}</p>
+                      <div key={group.id} className="question-group">
+                        {group.context && group.context !== '_' && (
+                          <div className="group-context">
+                            <p className="context-text" dangerouslySetInnerHTML={renderMarkdown(group.context)} />
+                          </div>
                         )}
-                        <div className="options-list">
-                          {question.options && question.options.map((option, optIdx) => {
-                            const optionLetter = String.fromCharCode(65 + optIdx)
-                            return (
-                              <div
-                                key={optIdx}
-                                onClick={() => handleAnswerSelect(questionId, optionLetter)}
-                                className={`option-item ${answers[questionId] === optionLetter ? 'selected' : ''}`}
-                              >
-                                <span className="option-label">{optionLetter}.</span>
-                                <span className="option-text">{option}</span>
+                        {group.subquestions.map((subq, subIdx) => {
+                          const currentQuestionNum = questionNum + subIdx + 1
+                          const questionId = `reorder-${group.id}-${subIdx}`
+                          return (
+                            <div key={subIdx} id={`question-${currentQuestionNum}`} className="sub-question">
+                              <div className="question-header">
+                                <span className="question-number">Câu {currentQuestionNum}</span>
                               </div>
-                            )
-                          })}
-                        </div>
+                              {subq.content && (
+                                <p
+                                  className="question-text"
+                                  dangerouslySetInnerHTML={renderMarkdown(subq.content)}
+                                />
+                              )}
+                              <div className="options-list">
+                                {subq.options.map((option, optIdx) => {
+                                  const optionLetter = String.fromCharCode(65 + optIdx)
+                                  return (
+                                    <div
+                                      key={optIdx}
+                                      onClick={() => handleAnswerSelect(questionId, optionLetter)}
+                                      className={`option-item ${answers[questionId] === optionLetter ? 'selected' : ''}`}
+                                    >
+                                      <span className="option-label">{optionLetter}.</span>
+                                      <span className="option-text">{option}</span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })}
                       </div>
                     )
                   })}
@@ -713,7 +740,9 @@ function Exam() {
 
                     // Add reorder questions
                     if (examData.reorder_questions) {
-                      questionNum += examData.reorder_questions.length
+                      examData.reorder_questions.forEach(g => {
+                        questionNum += g.subquestions.length
+                      })
                     }
 
                     // Calculate question number offset for fill_long
@@ -724,7 +753,7 @@ function Exam() {
                     return (
                       <div key={group.id} className="question-group">
                         <div className="group-context">
-                          <p className="context-text">{group.context}</p>
+                          <p className="context-text" dangerouslySetInnerHTML={renderMarkdown(group.context)} />
                         </div>
                         {group.subquestions.map((subq, subIdx) => {
                           const currentQuestionNum = questionNum + subIdx + 1
@@ -735,7 +764,7 @@ function Exam() {
                                 <span className="question-number">Câu {currentQuestionNum}</span>
                               </div>
                               {subq.content && (
-                                <p className="question-text">{subq.content}</p>
+                                <p className="question-text" dangerouslySetInnerHTML={renderMarkdown(subq.content)} />
                               )}
                               <div className="options-list">
                                 {subq.options.map((option, optIdx) => {
@@ -780,7 +809,9 @@ function Exam() {
 
                     // Add reorder questions
                     if (examData.reorder_questions) {
-                      questionNum += examData.reorder_questions.length
+                      examData.reorder_questions.forEach(g => {
+                        questionNum += g.subquestions.length
+                      })
                     }
 
                     // Add fill_long questions
@@ -798,7 +829,7 @@ function Exam() {
                     return (
                       <div key={group.id} className="question-group">
                         <div className="group-context reading-context">
-                          <p className="context-text">{group.context}</p>
+                          <p className="context-text" dangerouslySetInnerHTML={renderMarkdown(group.context)} />
                         </div>
                         {group.subquestions.map((subq, subIdx) => {
                           const currentQuestionNum = questionNum + subIdx + 1
@@ -809,7 +840,7 @@ function Exam() {
                                 <span className="question-number">Câu {currentQuestionNum}</span>
                               </div>
                               {subq.content && (
-                                <p className="question-text">{subq.content}</p>
+                                <p className="question-text" dangerouslySetInnerHTML={renderMarkdown(subq.content)} />
                               )}
                               <div className="options-list">
                                 {subq.options.map((option, optIdx) => {

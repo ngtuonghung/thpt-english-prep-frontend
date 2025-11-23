@@ -225,6 +225,23 @@ export default function Dashboard() {
 
       console.log('Response status:', response.status)
 
+      if (response.status === 404) {
+        try {
+            const errorData = await response.json();
+            const body = errorData.body ? (typeof errorData.body === 'string' ? JSON.parse(errorData.body) : errorData.body) : errorData;
+            setUploadStatus({
+                type: 'info',
+                message: body.message || 'Không có câu hỏi nào trong cơ sở dữ liệu để tạo đề thi.'
+            });
+        } catch (e) {
+            setUploadStatus({
+                type: 'info',
+                message: 'Không có câu hỏi nào trong cơ sở dữ liệu để tạo đề thi.'
+            });
+        }
+        return; 
+      }
+
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -244,8 +261,8 @@ export default function Dashboard() {
       console.log('Reorder Questions:', body.reorder_questions)
       console.log('===========================')
 
-      // Generate unique exam ID (timestamp-based)
-      const examId = Date.now()
+      // Use the quiz_id from the backend as the unique exam ID
+      const examId = body.quiz_id
 
       // Clear any existing exam data from session storage
       sessionStorage.removeItem('currentExam')
@@ -253,6 +270,7 @@ export default function Dashboard() {
       sessionStorage.removeItem('examStartTime')
       sessionStorage.removeItem('examTimeRemaining')
       sessionStorage.removeItem('examStarted')
+      sessionStorage.removeItem('submissionResult')
 
       // Save exam data to session storage
       sessionStorage.setItem('currentExam', JSON.stringify({

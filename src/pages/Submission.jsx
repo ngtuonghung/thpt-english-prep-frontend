@@ -17,10 +17,9 @@ function Submission() {
   const location = useLocation()
   const chatMessagesRef = useRef(null)
 
-  // Get exam data and answers from navigation state
-  const examData = location.state?.examData
-  const answers = location.state?.answers || {}
-  const examStartTime = location.state?.examStartTime
+  const [examData, setExamData] = useState(null)
+  const [answers, setAnswers] = useState(null)
+  const [examStartTime, setExamStartTime] = useState(null)
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user')
@@ -35,8 +34,37 @@ function Submission() {
       }
     }
 
-    setLoading(false)
-  }, [])
+    const stateData = location.state
+    if (stateData?.examData && stateData?.answers) {
+      console.log('Loading submission from location state')
+      setExamData(stateData.examData)
+      setAnswers(stateData.answers)
+      setExamStartTime(stateData.examStartTime)
+      // Persist to session storage for refresh
+      sessionStorage.setItem('submissionResult', JSON.stringify(stateData))
+      setLoading(false)
+    } else {
+      console.log('Loading submission from session storage')
+      const savedResult = sessionStorage.getItem('submissionResult')
+      if (savedResult) {
+        try {
+          const parsedResult = JSON.parse(savedResult)
+          setExamData(parsedResult.examData)
+          setAnswers(parsedResult.answers)
+          setExamStartTime(parsedResult.examStartTime)
+        } catch (error) {
+            console.error("Failed to parse submission result from session storage", error)
+            navigate('/dashboard')
+        }
+      } else {
+        // No data available, redirect
+        navigate('/dashboard')
+        return;
+      }
+      setLoading(false)
+    }
+  }, [location.state, navigate])
+
 
   // Auto-scroll chat messages to bottom
   useEffect(() => {
@@ -47,11 +75,12 @@ function Submission() {
 
   const formatDateTime = (date) => {
     if (!date) return ''
-    const hours = date.getHours().toString().padStart(2, '0')
-    const minutes = date.getMinutes().toString().padStart(2, '0')
-    const day = date.getDate().toString().padStart(2, '0')
-    const month = (date.getMonth() + 1).toString().padStart(2, '0')
-    const year = date.getFullYear()
+    const d = new Date(date)
+    const hours = d.getHours().toString().padStart(2, '0')
+    const minutes = d.getMinutes().toString().padStart(2, '0')
+    const day = d.getDate().toString().padStart(2, '0')
+    const month = (d.getMonth() + 1).toString().padStart(2, '0')
+    const year = d.getFullYear()
     return `${hours}:${minutes} - ${day}/${month}/${year}`
   }
 
@@ -90,24 +119,22 @@ function Submission() {
     }
   }, [activeChatQuestion, chatSessions])
 
+  const renderMarkdown = (text) => {
+    if (!text) return { __html: '' }
+    const html = text
+      .replace(/\*\*\*(.*?)\*\*\*/g, '<strong><em>$1</em></strong>') // Bold and Italic
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
+      .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italic
+      .replace(/\n/g, '<br />')
+    return { __html: html }
+  }
+
   // Build flat list of all questions - memoized for performance
   const getAllQuestions = useCallback(() => {
     if (!examData) return []
 
     const questions = []
     let questionNum = 1
-
-    // Reorder questions
-    if (examData.reorder_questions) {
-      examData.reorder_questions.forEach(q => {
-        questions.push({
-          num: questionNum++,
-          id: `reorder-${q.id}`,
-          type: 'reorder',
-          data: q
-        })
-      })
-    }
 
     // Fill short groups
     if (examData.groups.fill_short) {
@@ -118,7 +145,24 @@ function Submission() {
             id: `fill-short-${group.id}-${subIdx}`,
             type: 'fill_short',
             data: subq,
-            context: group.context
+            context: group.context,
+            isFirstInGroup: subIdx === 0
+          })
+        })
+      })
+    }
+
+    // Reorder questions
+    if (examData.reorder_questions) {
+      examData.reorder_questions.forEach(group => {
+        group.subquestions.forEach((subq, subIdx) => {
+          questions.push({
+            num: questionNum++,
+            id: `reorder-${group.id}-${subIdx}`,
+            type: 'reorder',
+            data: subq,
+            context: group.context && group.context !== '_' ? group.context : null,
+            isFirstInGroup: subIdx === 0
           })
         })
       })
@@ -133,7 +177,8 @@ function Submission() {
             id: `fill-long-${group.id}-${subIdx}`,
             type: 'fill_long',
             data: subq,
-            context: group.context
+            context: group.context,
+            isFirstInGroup: subIdx === 0
           })
         })
       })
@@ -148,7 +193,8 @@ function Submission() {
             id: `reading-${group.id}-${subIdx}`,
             type: 'reading',
             data: subq,
-            context: group.context
+            context: group.context,
+            isFirstInGroup: subIdx === 0
           })
         })
       })
@@ -163,7 +209,9 @@ function Submission() {
   // Calculate score based on correct_answer comparison
   const calculateScore = useMemo(() => {
     let correct = 0
-    let total = allQuestions.length
+    const total = allQuestions.length
+    if (!answers) return { correct: 0, total: 0, percentage: 0 };
+
 
     allQuestions.forEach(question => {
       const userAnswer = answers[question.id]
@@ -201,7 +249,7 @@ function Submission() {
 
     const userQuestion = chatInput
     setChatInput('')
-    
+
     // Reset textarea height
     setTimeout(() => {
       const textarea = document.querySelector('.chat-input-area textarea')
@@ -270,10 +318,10 @@ function Submission() {
 
       const data = await response.json()
       console.log('Response Data:', data)
-      
+
       // Parse response (handle different response formats)
       let aiText = 'Xin lỗi, tôi không thể trả lời câu hỏi này.'
-      
+
       if (typeof data === 'string') {
         aiText = data
       } else if (data.body) {
@@ -299,17 +347,17 @@ function Submission() {
       }))
     } catch (error) {
       console.error('Chat API error:', error)
-      
+
       // Show error message
       setChatSessions(prev => ({
         ...prev,
         [activeChatQuestion]: {
           messages: prev[activeChatQuestion].messages.map(msg =>
             msg.loading
-              ? { 
-                  ...msg, 
-                  text: `Xin lỗi, đã có lỗi xảy ra: ${error.message}. Vui lòng thử lại sau.`, 
-                  loading: false 
+              ? {
+                  ...msg,
+                  text: `Xin lỗi, đã có lỗi xảy ra: ${error.message}. Vui lòng thử lại sau.`,
+                  loading: false
                 }
               : msg
           )
@@ -327,16 +375,16 @@ function Submission() {
 
   const handleTextareaChange = (e) => {
     setChatInput(e.target.value)
-    
+
     // Auto-resize textarea
     const textarea = e.target
     textarea.style.height = 'auto'
     textarea.style.height = Math.min(textarea.scrollHeight, 168) + 'px'
   }
 
-  const renderQuestion = useCallback((question, index) => {
+  const renderQuestion = useCallback((question) => {
     const questionId = question.id
-    const userAnswer = answers[questionId]
+    const userAnswer = answers?.[questionId]
     const correctAnswer = question.data.correct_answer
     const isCorrect = userAnswer === correctAnswer
     const isEmptyAnswer = !userAnswer
@@ -376,18 +424,17 @@ function Submission() {
           </button>
         </div>
 
-        {question.context && index > 0 && allQuestions[index - 1]?.context !== question.context && (
+        {question.context && question.isFirstInGroup && (
           <div className="group-context">
-            <p className="context-text">{question.context}</p>
+            <p className="context-text" dangerouslySetInnerHTML={renderMarkdown(question.context)} />
           </div>
         )}
 
-        {question.type === 'reorder' && (
-          <p className="question-text">{question.data.content}</p>
-        )}
-
-        {(question.type === 'reading' && question.data.content) && (
-          <p className="question-text">{question.data.content}</p>
+        {question.data.content && (
+          <p
+            className="question-text"
+            dangerouslySetInnerHTML={renderMarkdown(question.data.content)}
+          />
         )}
 
         <div className="options-list">
@@ -396,7 +443,7 @@ function Submission() {
             const isUserAnswer = userAnswer === optionLetter
             const isCorrectAnswer = correctAnswer === optionLetter
 
-            // Logic: 
+            // Logic:
             // - Câu đúng: bôi xanh đáp án user chọn
             // - Câu sai: bôi đỏ đáp án user chọn + bôi xanh đáp án đúng
             // - Chưa chọn: bôi xanh đáp án đúng
@@ -431,21 +478,28 @@ function Submission() {
     )
   }, [answers, activeChatQuestion, handleChatBubbleClick, allQuestions])
 
-  if (loading) {
+  const handleBackToDashboard = () => {
+    // Clear all exam and submission related storage
+    sessionStorage.removeItem('currentExam');
+    sessionStorage.removeItem('examAnswers');
+    sessionStorage.removeItem('examStartTime');
+    sessionStorage.removeItem('examTimeRemaining');
+    sessionStorage.removeItem('examStarted');
+    sessionStorage.removeItem('submissionResult');
+    navigate('/dashboard');
+  };
+
+  if (loading || !examData || !answers) {
     return (
       <div className="loading">
         <div className="spinner"></div>
-        <p>Đang tải...</p>
+        <p>Đang tải kết quả...</p>
       </div>
     )
   }
 
   if (!user) {
     return <Navigate to="/" replace />
-  }
-
-  if (!examData) {
-    return <Navigate to="/dashboard" replace />
   }
 
   const currentChatSession = activeChatQuestion ? chatSessions[activeChatQuestion] : null
@@ -475,7 +529,7 @@ function Submission() {
                 </div>
                 <div className="info-row">
                   <span className="info-label">Tổng câu hỏi:</span>
-                  <span className="info-value">{examData.structure.total_questions}</span>
+                  <span className="info-value">{allQuestions.length}</span>
                 </div>
                 <div className="info-row">
                   <span className="info-label">Hoàn thành lúc:</span>
@@ -487,7 +541,7 @@ function Submission() {
               {allQuestions.map((question, index) => renderQuestion(question, index))}
 
               {/* Back Button */}
-              <button onClick={() => navigate('/dashboard')} className="btn-back-dashboard">
+              <button onClick={handleBackToDashboard} className="btn-back-dashboard">
                 Quay lại Dashboard
               </button>
             </div>
@@ -503,7 +557,7 @@ function Submission() {
                   </svg>
                   <span>Chat với AI - Câu {allQuestions.find(q => q.id === activeChatQuestion)?.num}</span>
                 </div>
-                <button 
+                <button
                   className="close-chat-btn"
                   onClick={() => setActiveChatQuestion(null)}
                   title="Đóng chat"
@@ -522,7 +576,7 @@ function Submission() {
                       {message.sender === 'ai' ? '🤖' : '👤'}
                     </div>
                     <div className="message-content">
-                      <div 
+                      <div
                         className={`message-text ${message.loading ? 'loading' : ''}`}
                         dangerouslySetInnerHTML={{ __html: message.text }}
                       />
@@ -543,7 +597,7 @@ function Submission() {
                     placeholder="Gửi tin nhắn..."
                     rows={1}
                   />
-                  <button 
+                  <button
                     onClick={handleSendMessage}
                     disabled={!chatInput.trim()}
                     className="send-btn"

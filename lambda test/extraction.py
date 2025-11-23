@@ -168,23 +168,10 @@ class Extraction:
         # Pattern for reading passages (more specific - must have "Read the following")
         group_choices_reg = r'(?si)(Read\s+the\s+following\s+(?:passage|text|extract).*?from\s+(\d+)\s+to\s+(\d+).*?Question\s*\3\b.*?(?:A[.)].*?B[.)].*?C[.)].*?D[.)].*?(?=\n|$)))'
 
-        # Pattern for fill-in-the-blank with shared context
+        # Pattern for fill-in-the-blank with shared context (must NOT start with "Read the following")
         fill_reg = r'(?sm)((?:FEELING|Our|[A-Z][a-z]+(?:\s+[a-z]+){1,5}).*?from\s+(\d+)\s+to\s+(\d+).*?Question\s*\3\b.*?(?:A[.)].*?B[.)].*?C[.)].*?D[.)].*?(?=\n|$)))'
 
-        # Extract reordering questions FIRST (so they don't get matched by fill_reg)
-        reorder_block = self.get_block(reorder_reg)
-        for block in reorder_block:
-            question_range = (block["x"], block["y"])
-            if question_range not in extracted_ranges:
-                extracted_ranges.add(question_range)
-                # Extract as individual questions (type 0)
-                single_questions = self.extract_components([block], single=True)
-                if single_questions and len(single_questions) > 0:
-                    # Flatten the list - single_questions is a list containing one list of questions
-                    for sq in single_questions[0]:
-                        results.append(sq)
-
-        # Extract reading passages second
+        # Extract reading passages first
         group_choices_block = self.get_block(group_choices_reg)
         for block in group_choices_block:
             question_range = (block["x"], block["y"])
@@ -193,7 +180,7 @@ class Extraction:
                 extracted = self.extract_components([block], single=False)
                 results += extracted
 
-        # Extract fill-in-the-blank sections last (skip if already extracted)
+        # Extract fill-in-the-blank sections (skip if already extracted)
         fill_block = self.get_block(fill_reg)
         for block in fill_block:
             question_range = (block["x"], block["y"])
@@ -201,6 +188,16 @@ class Extraction:
                 extracted_ranges.add(question_range)
                 extracted = self.extract_components([block], single=False)
                 results += extracted
+
+        # Extract reordering questions (single questions, no shared context)
+        reorder_block = self.get_block(reorder_reg)
+        for block in reorder_block:
+            question_range = (block["x"], block["y"])
+            if question_range not in extracted_ranges:
+                extracted_ranges.add(question_range)
+                single_questions = self.extract_components([block], single=True)
+                if single_questions and len(single_questions) > 0:
+                    results += single_questions[0]
 
         # Sort results by the first question number in each block
         def get_first_question_num(block):
