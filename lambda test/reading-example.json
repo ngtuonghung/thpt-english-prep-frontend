@@ -1,0 +1,148 @@
+{
+  "id": {
+    "N": "1763992300115461"
+  },
+  "context": {
+    "S": "The World's First GPS\nOn a stormy night in 1707, four ships struck rocks off the south coast of England and sank. One thousand, four hundred sailors were drowned. The ships had crashed because they had no way of knowing how far they had travelled in a particular direction; they could not calculate their longitude, which required\n\naccurate time meas urement. (18) _____. In such difficult circumstances, they believed that the best response to the disaster was a competition: the Longitude Prize.\nThe Longitude Prize was no ordinary competition. (19) _____. Geniuses such as Sir Isaac Newton had failed to find a solution, so to ensure the interest of Britain's greatest scientific minds, the government offered a prize of £20,000 - the equivalent of £2.6 million in today's money. But to everyone's surprise, it wasn't a famous academic who solved the problem, but an unknown carpenter. When John Harrison wasn't working with wood, (20) _____. An accurate clock would allow sailors to calculate their position, but at the time it was thought impossible to create a mechanical clock (21) _____. The movement of the sea and the changes in temperature destroyed the delicate parts. However, after three frustrated attempts,\nHarrison's fourth sea clock, H4, finally triumphed. Its mechanics were so good that the H14 worked better than most clocks on land.\nThe Longitude Prize and Harrison's success (22) _____. However, in 2013, the British government created a new Longitude Prize, offering £10 million to the person who could solve a great challenge to humanity.\n\n[Adapted from Friends Global]"
+  },
+  "question_type": {
+    "S": "fill_long"
+  },
+  "subquestions": {
+    "L": [
+      {
+        "M": {
+          "content": {
+            "S": ""
+          },
+          "correct_answer": {
+            "S": "C"
+          },
+          "options": {
+            "L": [
+              {
+                "S": "A. It was one of the most serious maritime accidents in the world that forced the British government to take\naction."
+              },
+              {
+                "S": "B. A series of such incidents occurred, leaving the British government stunned and deciding to act."
+              },
+              {
+                "S": "C. It was the most serious in a series of accidents at sea, and a stunned British government decided to act."
+              },
+              {
+                "S": "D. The British government was shocked by the incident and decided to respond, as it was a frequent\n\noccurrence."
+              }
+            ]
+          }
+        }
+      },
+      {
+        "M": {
+          "content": {
+            "S": ""
+          },
+          "correct_answer": {
+            "S": "C"
+          },
+          "options": {
+            "L": [
+              {
+                "S": "A. To win, one had to calculate the distance a ship had travelled since it set out."
+              },
+              {
+                "S": "B. Someone was required to discover a method for determining how far a ship had gone east or west from\nits starting point."
+              },
+              {
+                "S": "C. To win it, someone had to find a way of calculating how far a ship had travelled east or west from its\npoint of departure"
+              },
+              {
+                "S": "D. The competition required the winner to find a method to calculate the east-west distance of the ship from\nits starting point."
+              }
+            ]
+          }
+        }
+      },
+      {
+        "M": {
+          "content": {
+            "S": ""
+          },
+          "correct_answer": {
+            "S": "B"
+          },
+          "options": {
+            "L": [
+              {
+                "S": "A. He studied to make clocks."
+              },
+              {
+                "S": "B. Making clocks."
+              },
+              {
+                "S": "C. While John Harrison wasn't making clocks."
+              },
+              {
+                "S": "D. Teaching how to make clocks."
+              }
+            ]
+          }
+        }
+      },
+      {
+        "M": {
+          "content": {
+            "S": ""
+          },
+          "correct_answer": {
+            "S": "B"
+          },
+          "options": {
+            "L": [
+              {
+                "S": "A. Which work on a ship"
+              },
+              {
+                "S": "B. Working on a ship"
+              },
+              {
+                "S": "C. That could operate on a ship"
+              },
+              {
+                "S": "D. Designed to function on a ship"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "M": {
+          "content": {
+            "S": ""
+          },
+          "correct_answer": {
+            "S": "C"
+          },
+          "options": {
+            "L": [
+              {
+                "S": "A. Makes people interested in the 18th century, but it remained noted in the years that followed."
+              },
+              {
+                "S": "B. Attracting a lot of attention in the 18th century and was quickly forgotten."
+              },
+              {
+                "S": "C. Generated a lot of interest in the 18th century, but it was soon forgotten"
+              },
+              {
+                "S": "D. It caused significant interest in the 18th century, although it quickly faded away."
+              }
+            ]
+          }
+        }
+      }
+    ]
+  },
+  "type": {
+    "N": "1"
+  }
+}

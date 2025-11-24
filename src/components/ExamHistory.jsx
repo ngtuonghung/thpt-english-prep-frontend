@@ -15,7 +15,7 @@ export default function ExamHistory({ accessToken, onLoadingChange }) {
 
     try {
       console.log('Fetching exam history...')
-      const response = await fetch(`${API_BASE}/submission?type=all`, {
+      const response = await fetch(`${API_BASE}/submission?id=-1`, {
         headers: {
           'Authorization': `Bearer ${accessToken}`
         }

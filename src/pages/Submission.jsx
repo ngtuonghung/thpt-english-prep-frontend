@@ -33,6 +33,34 @@ function Submission() {
   const [showNavigationModal, setShowNavigationModal] = useState(false)
   const isNavigatingAway = useRef(false)
 
+  // Function to fetch exam data from database
+  const fetchExamFromDatabase = async (examId, user) => {
+    try {
+      console.log(`Fetching exam ${examId} from database...`)
+      const response = await fetch(`${API_BASE}/submission?id=${examId}`, {
+        headers: {
+          'Authorization': `Bearer ${user.id_token}`
+        }
+      })
+
+      if (!response.ok) {
+        console.error('Failed to fetch exam from database:', response.status)
+        navigate('/dashboard')
+        return
+      }
+
+      const data = await response.json()
+      console.log('Fetched exam data:', data)
+
+      // TODO: Process and set the fetched data
+      // For now, redirect to dashboard since backend doesn't return full exam data yet
+      navigate('/dashboard')
+    } catch (error) {
+      console.error('Error fetching exam from database:', error)
+      navigate('/dashboard')
+    }
+  }
+
   // Save model preference to localStorage
   useEffect(() => {
     localStorage.setItem('aiModel', selectedModel)
@@ -50,7 +78,7 @@ function Submission() {
       }
     }
 
-    // Get exam ID from URL parameter
+    // Get exam ID from URL
     const urlExamId = searchParams.get('id')
 
     // Redirect if no exam ID in URL
@@ -60,15 +88,29 @@ function Submission() {
       return
     }
 
+    // Load from sessionStorage
     const savedExam = sessionStorage.getItem('currentExam');
     const savedAnswers = sessionStorage.getItem('examAnswers');
     const savedStartTime = sessionStorage.getItem('examStartTime');
     const savedFinishTime = sessionStorage.getItem('examFinishTime');
 
-    // Redirect if no session data
-    if (!savedExam || !savedAnswers) {
-      console.warn('No exam data found in session storage for submission page.')
-      navigate('/dashboard')
+    // Check for missing fields
+    const missingFields = []
+    if (!savedExam) missingFields.push('currentExam')
+    if (!savedAnswers) missingFields.push('examAnswers')
+    if (!savedStartTime) missingFields.push('examStartTime')
+    if (!savedFinishTime) missingFields.push('examFinishTime')
+
+    // If any field is missing, fetch from database
+    if (missingFields.length > 0) {
+      console.log('=== Missing sessionStorage fields ===')
+      console.log('Missing:', missingFields.join(', '))
+      console.log('Exam ID from URL:', urlExamId)
+      console.log('Fetching from database...')
+      console.log('====================================')
+      
+      // Fetch exam data from database
+      fetchExamFromDatabase(urlExamId, parsedUser)
       return
     }
 
