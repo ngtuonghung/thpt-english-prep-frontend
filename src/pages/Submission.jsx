@@ -289,7 +289,7 @@ function Submission() {
             {
               id: `initial-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               sender: 'ai',
-              text: 'Bạn muốn hỏi gì?',
+              text: 'Bạn muốn hỏi gì về câu này?',
               timestamp: new Date(),
               isInitialPrompt: true // Mark as initial prompt to exclude from storage
             }
