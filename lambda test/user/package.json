@@ -1,0 +1,17 @@
+{
+  "name": "user-lambda",
+  "version": "1.0.0",
+  "description": "Lambda function to get user information from Cognito using access token",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "lambda",
+    "cognito",
+    "user-info"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {}
+}

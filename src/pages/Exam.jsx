@@ -446,7 +446,7 @@ function Exam() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${user.access_token}`,
+          Authorization: `Bearer ${user.id_token}`,
         },
         body: JSON.stringify({
           user_id: userInfo.sub,

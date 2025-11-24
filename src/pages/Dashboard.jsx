@@ -25,7 +25,7 @@ export default function Dashboard() {
   const hasFetchedRef = useRef(false)
   const fileInputRef = useRef(null)
 
-  const fetchUserInfo = useCallback(async (accessToken) => {
+  const fetchUserInfo = useCallback(async (idToken) => {
     // Prevent duplicate fetches
     if (fetchingRef.current || hasFetchedRef.current) {
       console.log('Skipping duplicate fetch request')
@@ -39,7 +39,7 @@ export default function Dashboard() {
       console.log('Fetching user info...')
       const response = await fetch(`${API_BASE}/user`, {
         headers: {
-          'Authorization': `Bearer ${accessToken}`
+          'Authorization': `Bearer ${idToken}`
         }
       })
       console.log('User info response status:', response.status)
@@ -84,9 +84,9 @@ export default function Dashboard() {
         setFetchingUserInfo(false)
         hasFetchedRef.current = true
         console.log('Using cached user info')
-      } else if (parsedUser.access_token) {
+      } else if (parsedUser.id_token) {
         // Fetch user info from API only if not cached
-        fetchUserInfo(parsedUser.access_token)
+        fetchUserInfo(parsedUser.id_token)
       }
     }
     setLoading(false)
@@ -158,9 +158,9 @@ export default function Dashboard() {
           reject(new Error('Upload cancelled'))
         })
 
-        xhr.open('POST', `${API_BASE}/upload`)
+        xhr.open('POST', `${API_BASE}/upload`, true)
         xhr.setRequestHeader('Content-Type', 'application/json')
-        xhr.setRequestHeader('Authorization', `Bearer ${user.access_token}`)
+        xhr.setRequestHeader('Authorization', `Bearer ${user.id_token}`)
         xhr.send(JSON.stringify({ file: base64 }))
       })
 
@@ -309,7 +309,7 @@ export default function Dashboard() {
       const response = await fetch(`${API_BASE}/exam`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${user.access_token}`,
+          'Authorization': `Bearer ${user.id_token}`,
           'Content-Type': 'application/json'
         }
       })
@@ -541,7 +541,7 @@ export default function Dashboard() {
 
           {/* Exam History Section */}
           <ExamHistory 
-            accessToken={user?.access_token} 
+            accessToken={user?.id_token} 
             onLoadingChange={setLoadingHistory}
           />
         </div>

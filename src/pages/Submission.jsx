@@ -464,7 +464,7 @@ function Submission() {
       console.log('URL:', CHAT_API)
       console.log('Headers:', {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${user.access_token}`
+        'Authorization': `Bearer ${user.id_token}`
       })
       console.log('Body:', JSON.stringify(requestBody, null, 2))
       console.log('================================================')
@@ -492,7 +492,7 @@ function Submission() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${user.access_token}`
+          'Authorization': `Bearer ${user.id_token}`
         },
         body: JSON.stringify(requestBody)
       })
