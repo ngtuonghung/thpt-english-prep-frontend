@@ -61,6 +61,9 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => {
+    // Clear all session storage on Dashboard load
+    sessionStorage.clear()
+
     const savedUser = localStorage.getItem('user')
     const savedUserInfo = localStorage.getItem('userInfo')
 
@@ -264,13 +267,8 @@ export default function Dashboard() {
       // Use the quiz_id from the backend as the unique exam ID
       const examId = body.quiz_id
 
-      // Clear any existing exam data from session storage
-      sessionStorage.removeItem('currentExam')
-      sessionStorage.removeItem('examAnswers')
-      sessionStorage.removeItem('examStartTime')
-      sessionStorage.removeItem('examTimeRemaining')
-      sessionStorage.removeItem('examDoing')
-      sessionStorage.removeItem('submissionResult')
+      // Clear all session storage before creating new exam
+      sessionStorage.clear()
 
       // Save exam data to session storage
       sessionStorage.setItem('currentExam', JSON.stringify({

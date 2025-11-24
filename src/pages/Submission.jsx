@@ -3,6 +3,7 @@ import { useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import './Submission.css'
 import TopBar from '../components/TopBar'
 import QuestionsList from '../components/QuestionsList'
+import ConfirmModal from '../components/ConfirmModal'
 
 const API_BASE = 'https://hrj5qc8u76.execute-api.ap-southeast-1.amazonaws.com/prod'
 const CHAT_API = 'https://e9hi4aqre3.execute-api.ap-southeast-1.amazonaws.com/v2/chat'
@@ -15,6 +16,10 @@ function Submission() {
   const [activeChatQuestion, setActiveChatQuestion] = useState(null)
   const [chatSessions, setChatSessions] = useState({}) // Store chat sessions by question ID
   const [chatInput, setChatInput] = useState('')
+  const [selectedModel, setSelectedModel] = useState(() => {
+    // Load from localStorage, default to 'watsonx'
+    return localStorage.getItem('aiModel') || 'watsonx'
+  })
   const navigate = useNavigate()
   const chatMessagesRef = useRef(null)
   const chatInputRef = useRef(null)
@@ -23,6 +28,14 @@ function Submission() {
   const [answers, setAnswers] = useState(null)
   const [examStartTime, setExamStartTime] = useState(null)
   const [examFinishTime, setExamFinishTime] = useState(null)
+  const [showBackModal, setShowBackModal] = useState(false)
+  const [showNavigationModal, setShowNavigationModal] = useState(false)
+  const isNavigatingAway = useRef(false)
+
+  // Save model preference to localStorage
+  useEffect(() => {
+    localStorage.setItem('aiModel', selectedModel)
+  }, [selectedModel])
 
   useEffect(() => {
     const savedUser = localStorage.getItem('user')
@@ -85,12 +98,21 @@ function Submission() {
       if (savedChatSessions) {
         try {
           const parsedSessions = JSON.parse(savedChatSessions);
-          // Convert timestamp strings back to Date objects
+          // Convert timestamp strings back to Date objects and regenerate IDs if needed
           Object.keys(parsedSessions).forEach(questionId => {
-            parsedSessions[questionId].messages = parsedSessions[questionId].messages.map(msg => ({
-              ...msg,
-              timestamp: new Date(msg.timestamp)
-            }));
+            parsedSessions[questionId].messages = parsedSessions[questionId].messages.map((msg, idx) => {
+              // Regenerate ID if it's in old format (numeric or doesn't have prefix)
+              const needsNewId = typeof msg.id === 'number' || !msg.id.toString().includes('-');
+              const newId = needsNewId 
+                ? `${msg.sender}-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 9)}`
+                : msg.id;
+              
+              return {
+                ...msg,
+                id: newId,
+                timestamp: new Date(msg.timestamp)
+              };
+            });
           });
           setChatSessions(parsedSessions);
         } catch (error) {
@@ -123,27 +145,104 @@ function Submission() {
   useEffect(() => {
     if (Object.keys(chatSessions).length > 0) {
       const timeoutId = setTimeout(() => {
-        // Filter out initial prompt messages and empty sessions before saving
-        const sessionsToSave = {};
+        const serializedSessions = {}
         Object.keys(chatSessions).forEach(questionId => {
-          const realMessages = chatSessions[questionId].messages.filter(msg => !msg.isInitialPrompt);
-          // Only save if there are real messages (user has sent at least one message)
-          if (realMessages.length > 0) {
-            sessionsToSave[questionId] = {
-              messages: realMessages
-            };
+          const session = chatSessions[questionId]
+          serializedSessions[questionId] = {
+            messages: session.messages.map(msg => ({
+              id: msg.id,
+              sender: msg.sender,
+              text: msg.text,
+              timestamp: msg.timestamp.toISOString(),
+              model: msg.model,
+              loading: msg.loading,
+              streaming: msg.streaming,
+              isInitialPrompt: msg.isInitialPrompt
+            }))
           }
-        });
-        
-        // Only save to sessionStorage if there are sessions with real messages
-        if (Object.keys(sessionsToSave).length > 0) {
-          sessionStorage.setItem('chatSessions', JSON.stringify(sessionsToSave));
-        }
+        })
+        sessionStorage.setItem('chatSessions', JSON.stringify(serializedSessions));
       }, 500); // Debounce 500ms
 
       return () => clearTimeout(timeoutId);
     }
   }, [chatSessions])
+
+  // Handle browser navigation (back/forward button, external navigation, tab close, refresh)
+  useEffect(() => {
+    // Handle popstate (back/forward button)
+    const handlePopState = (e) => {
+      if (!isNavigatingAway.current) {
+        e.preventDefault()
+        // Push state again to keep user on page
+        window.history.pushState(null, '', window.location.href)
+        setShowNavigationModal(true)
+      }
+    }
+
+    // Handle beforeunload (closing tab, refreshing, or typing new URL in address bar)
+    const handleBeforeUnload = (e) => {
+      if (!isNavigatingAway.current) {
+        e.preventDefault()
+        e.returnValue = 'Lịch sử chat của bạn sẽ không được lưu nếu rời khỏi trang này. Bạn có chắc chắn muốn tiếp tục không?'
+        return e.returnValue
+      }
+    }
+
+    // Handle unload (when page is actually closing)
+    const handleUnload = () => {
+      if (!isNavigatingAway.current) {
+        console.log('User closed tab from submission page')
+      }
+    }
+
+    // Intercept all link clicks to show custom modal
+    const handleClick = (e) => {
+      if (!isNavigatingAway.current) {
+        const target = e.target.closest('a')
+        if (target && target.href) {
+          // Check if it's an external link or different page
+          const currentOrigin = window.location.origin
+          const targetUrl = new URL(target.href, currentOrigin)
+          
+          if (targetUrl.origin !== currentOrigin || 
+              targetUrl.pathname !== window.location.pathname) {
+            e.preventDefault()
+            setShowNavigationModal(true)
+          }
+        }
+      }
+    }
+
+    // Intercept form submissions
+    const handleSubmit = (e) => {
+      if (!isNavigatingAway.current) {
+        const form = e.target
+        if (form.action && form.action !== window.location.href) {
+          e.preventDefault()
+          setShowNavigationModal(true)
+        }
+      }
+    }
+
+    // Push initial state when component mounts
+    window.history.pushState(null, '', window.location.href)
+
+    // Add event listeners
+    window.addEventListener('popstate', handlePopState)
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener('unload', handleUnload)
+    document.addEventListener('click', handleClick, true)
+    document.addEventListener('submit', handleSubmit, true)
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState)
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      window.removeEventListener('unload', handleUnload)
+      document.removeEventListener('click', handleClick, true)
+      document.removeEventListener('submit', handleSubmit, true)
+    }
+  }, [])
 
   const formatDateTime = (date) => {
     if (!date) return ''
@@ -188,7 +287,7 @@ function Submission() {
         [questionId]: {
           messages: [
             {
-              id: 0,
+              id: `initial-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
               sender: 'ai',
               text: 'Bạn muốn hỏi gì?',
               timestamp: new Date(),
@@ -320,7 +419,7 @@ function Submission() {
     const currentSession = chatSessions[activeChatQuestion] || { messages: [] }
     
     const userMessage = {
-      id: currentSession.messages.length + 1,
+      id: `user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       sender: 'user',
       text: chatInput,
       timestamp: new Date()
@@ -362,7 +461,8 @@ function Submission() {
         options: currentQuestion.data.options || [],
         correct_answer: correctAnswer,
         user_choice: userChoice || '',
-        chat_history: chatHistory
+        chat_history: chatHistory,
+        model: selectedModel  // Add selected model to request
       }
 
       // Log request details to console
@@ -379,7 +479,7 @@ function Submission() {
       console.log('================================================')
 
       // Add thinking message
-      const thinkingId = currentSession.messages.length + 2
+      const thinkingId = `ai-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
       setChatSessions(prev => ({
         ...prev,
         [activeChatQuestion]: {
@@ -423,16 +523,31 @@ function Submission() {
       // Parse response from Lambda
       let aiText = 'Xin lỗi, tôi không thể trả lời câu hỏi này.'
       let tokenCount = null
+      let modelUsed = null
 
-      if (data.response) {
-        // Standard response format from Lambda
-        aiText = data.response
+      // Check for special indicators
+      if (data.empty || data.off_topic) {
+        aiText = data.message || 'Vui lòng nhập câu hỏi hợp lệ.'
         tokenCount = data.tokens || null
+        modelUsed = data.model || null
+      } else if (data.response !== undefined) {
+        // Standard response format from Lambda
+        aiText = data.response || data.message || 'Không có phản hồi.'
+        tokenCount = data.tokens || null
+        modelUsed = data.model || null
       } else if (data.body) {
         // If body is a string, try parsing it
         try {
           const bodyData = typeof data.body === 'string' ? JSON.parse(data.body) : data.body
-          aiText = bodyData.response || bodyData.message || JSON.stringify(bodyData)
+          
+          // Check for special indicators in body
+          if (bodyData.empty || bodyData.off_topic) {
+            aiText = bodyData.message || 'Vui lòng nhập câu hỏi hợp lệ.'
+          } else {
+            aiText = bodyData.response || bodyData.message || JSON.stringify(bodyData)
+          }
+          tokenCount = bodyData.tokens || null
+          modelUsed = bodyData.model || null
         } catch {
           aiText = data.body
         }
@@ -446,6 +561,8 @@ function Submission() {
       }
 
       console.log('Parsed AI Text:', aiText.substring(0, 200) + (aiText.length > 200 ? '...' : ''))
+      console.log('Token Count:', tokenCount)
+      console.log('Model Used:', modelUsed)
 
       // Animate text token by token (like ChatGPT)
       const words = aiText.split(' ')
@@ -457,7 +574,7 @@ function Submission() {
         [activeChatQuestion]: {
           messages: prev[activeChatQuestion].messages.map(msg =>
             msg.id === thinkingId
-              ? { ...msg, text: '', loading: false, streaming: true, tokens: tokenCount }
+              ? { ...msg, text: '', loading: false, streaming: true, tokens: tokenCount, model: modelUsed }
               : msg
           )
         }
@@ -520,7 +637,7 @@ function Submission() {
         }
       }))
     }
-  }, [chatInput, activeChatQuestion, chatSessions, allQuestions, answers, user])
+  }, [chatInput, activeChatQuestion, chatSessions, allQuestions, answers, user, selectedModel])
 
   const handleKeyPress = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -667,6 +784,14 @@ function Submission() {
   }, [renderMarkdown, renderQuestion])
 
   const handleBackToDashboard = () => {
+    // Always show confirmation modal
+    setShowBackModal(true)
+  };
+
+  const confirmBackToDashboard = () => {
+    // Set flag to allow navigation
+    isNavigatingAway.current = true
+    
     // Clear all exam and submission related storage
     sessionStorage.removeItem('currentExam');
     sessionStorage.removeItem('examAnswers');
@@ -678,6 +803,20 @@ function Submission() {
     sessionStorage.removeItem('chatSessions');
     navigate('/dashboard');
   };
+
+  const handleConfirmNavigation = () => {
+    // Set flag to allow navigation
+    isNavigatingAway.current = true
+    
+    // Close modal and navigate back
+    setShowNavigationModal(false)
+    navigate('/dashboard')
+  }
+
+  const handleCancelNavigation = () => {
+    setShowNavigationModal(false)
+    // User chose to stay, do nothing
+  }
 
   if (loading || !examData || !answers) {
     return (
@@ -774,24 +913,43 @@ function Submission() {
                 </svg>
                 <span>Chat với AI - Câu {allQuestions.find(q => q.id === activeChatQuestion)?.num}</span>
               </div>
-              <button
-                className="close-chat-btn"
-                onClick={() => setActiveChatQuestion(null)}
-                title="Đóng chat"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="18" y1="6" x2="6" y2="18"></line>
-                  <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-              </button>
+              <div className="chat-header-actions">
+                <label htmlFor="model-selector" className="model-selector-label">Chọn model:</label>
+                <select 
+                  id="model-selector"
+                  className="model-selector"
+                  value={selectedModel}
+                  onChange={(e) => setSelectedModel(e.target.value)}
+                  title="Chọn mô hình AI"
+                >
+                  <option value="watsonx">WatsonX</option>
+                  <option value="gemini">Gemini</option>
+                </select>
+                <button
+                  className="close-chat-btn"
+                  onClick={() => setActiveChatQuestion(null)}
+                  title="Đóng chat"
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                </button>
+              </div>
             </div>
 
             <div className="chat-messages" ref={chatMessagesRef}>
               {currentChatSession?.messages.map(message => (
                 message.sender === 'user' ? (
                   <div key={message.id} className={`chat-message ${message.sender}`}>
-                    <div className="message-avatar">
-                      👤
+                    <div className="message-avatar user-avatar">
+                      {userInfo?.picture ? (
+                        <img src={userInfo.picture} alt={userInfo.username || 'User'} className="user-avatar-img" />
+                      ) : (
+                        <span className="user-avatar-initials">
+                          {userInfo?.username?.substring(0, 2).toUpperCase() || userInfo?.name?.substring(0, 2).toUpperCase() || userInfo?.email?.substring(0, 2).toUpperCase() || '👤'}
+                        </span>
+                      )}
                     </div>
                     <div className="message-content">
                       <div
@@ -804,22 +962,37 @@ function Submission() {
                     </div>
                   </div>
                 ) : (
-                  <div key={message.id} className="ai-response-text">
-                    {message.loading ? (
-                      <div className="thinking-text">
-                        Đang suy nghĩ<span className="thinking-dots"></span>
-                      </div>
-                    ) : (
-                      <>
-                        <div style={{ display: 'inline' }} dangerouslySetInnerHTML={{ __html: message.text }} />
-                        {message.streaming && <span className="streaming-cursor">▊</span>}
-                        {!message.streaming && message.tokens && (
-                          <div className="message-tokens">
-                            {message.tokens} tokens
+                  <div key={message.id} className="chat-message ai">
+                    <div className="message-avatar ai-avatar">
+                      {message.model === 'gemini' && (
+                        <img 
+                          src="https://registry.npmmirror.com/@lobehub/icons-static-png/1.74.0/files/dark/gemini-color.png" 
+                          alt="Gemini"
+                          className="ai-avatar-img"
+                        />
+                      )}
+                      {message.model === 'watsonx' && (
+                        <img 
+                          src="https://ibm.gallerycdn.vsassets.io/extensions/ibm/watsonx-data/1.2.0/1758701492843/Microsoft.VisualStudio.Services.Icons.Default" 
+                          alt="WatsonX"
+                          className="ai-avatar-img"
+                        />
+                      )}
+                    </div>
+                    <div className="message-content">
+                      <div className="ai-response-text">
+                        {message.loading ? (
+                          <div className="thinking-text">
+                            Đang suy nghĩ<span className="thinking-dots"></span>
                           </div>
+                        ) : (
+                          <>
+                            <span dangerouslySetInnerHTML={{ __html: message.text }} />
+                            {message.streaming && <span className="streaming-cursor">▊</span>}
+                          </>
                         )}
-                      </>
-                    )}
+                      </div>
+                    </div>
                   </div>
                 )
               ))}
@@ -849,6 +1022,29 @@ function Submission() {
           </div>
         </div>
       </main>
+
+      {/* Confirmation Modals */}
+      <ConfirmModal
+        isOpen={showBackModal}
+        onClose={() => setShowBackModal(false)}
+        onConfirm={confirmBackToDashboard}
+        title="Quay lại Dashboard"
+        message="Lịch sử chat của bạn sẽ không được lưu nếu quay lại Dashboard. Bạn có chắc chắn muốn tiếp tục không?"
+        confirmText="Quay lại"
+        cancelText="Ở lại"
+        confirmStyle="danger"
+      />
+
+      <ConfirmModal
+        isOpen={showNavigationModal}
+        onClose={handleCancelNavigation}
+        onConfirm={handleConfirmNavigation}
+        title="Rời khỏi trang"
+        message="Lịch sử chat của bạn sẽ không được lưu nếu rời khỏi trang này. Bạn có chắc chắn muốn tiếp tục không?"
+        confirmText="Rời khỏi"
+        cancelText="Ở lại"
+        confirmStyle="danger"
+      />
     </div>
   )
 }
