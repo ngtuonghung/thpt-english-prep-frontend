@@ -450,7 +450,7 @@ function Exam() {
         },
         body: JSON.stringify({
           user_id: userInfo.sub,
-          quiz_id: examData.quiz_id,
+          examData,
           answers,
           examStartTime,
         }),
