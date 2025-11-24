@@ -101,6 +101,7 @@
   display: flex;
   gap: 0.75rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .btn-outline {
@@ -168,8 +169,8 @@
 }
 
 .review-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 1rem;
   margin-bottom: 2rem;
 }
@@ -398,7 +399,6 @@
 }
 
 .loading-strip {
-  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -407,6 +407,7 @@
   padding: 0.85rem 1rem;
   border-radius: 10px;
   color: #5a5a5a;
+  width: 100%;
 }
 
 .dot {

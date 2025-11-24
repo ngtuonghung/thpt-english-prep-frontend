@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { Navigate } from 'react-router-dom'
+import { Navigate, useNavigate } from 'react-router-dom'
 import './ReviewQuiz.css'
 import TopBar from '../components/TopBar'
 
@@ -15,6 +15,7 @@ const shuffleAndTake = (list, count) => {
 }
 
 export default function ReviewQuiz() {
+  const navigate = useNavigate()
   const [user, setUser] = useState(null)
   const [userInfo, setUserInfo] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -147,6 +148,10 @@ export default function ReviewQuiz() {
     setScore(0)
   }
 
+  const handleGoBack = () => {
+    navigate('/dashboard')
+  }
+
   if (loading) {
     return (
       <div className="loading">
@@ -209,6 +214,12 @@ export default function ReviewQuiz() {
               )}
             </div>
             <div className="review-actions">
+              <button
+                className="btn-outline"
+                onClick={handleGoBack}
+              >
+                Quay lại
+              </button>
               <button
                 className="btn-outline"
                 onClick={handleReshuffle}
