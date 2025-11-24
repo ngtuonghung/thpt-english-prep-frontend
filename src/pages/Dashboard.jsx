@@ -16,6 +16,9 @@ export default function Dashboard() {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadStatus, setUploadStatus] = useState(null)
+  const [currentFileIndex, setCurrentFileIndex] = useState(0)
+  const [totalFiles, setTotalFiles] = useState(0)
+  const [uploadResults, setUploadResults] = useState([])
   const [creatingExam, setCreatingExam] = useState(false)
   const [loadingHistory, setLoadingHistory] = useState(false)
   const fetchingRef = useRef(false)
@@ -89,30 +92,15 @@ export default function Dashboard() {
     setLoading(false)
   }, [fetchUserInfo])
 
-  const handleFileSelect = async (event) => {
-    const file = event.target.files[0]
-    if (!file) return
-
-    // Validate file type
-    if (file.type !== 'application/pdf') {
-      setUploadStatus({ type: 'error', message: 'Vui lòng chọn tệp PDF' })
-      return
-    }
-
-    // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      setUploadStatus({ type: 'error', message: 'Kích thước tệp phải nhỏ hơn 10MB' })
-      return
-    }
-
-    setUploading(true)
-    setUploadProgress(0)
-    setUploadStatus(null)
+  const uploadSingleFile = async (file, fileIndex, totalCount) => {
+    console.log(`Uploading file ${fileIndex + 1}/${totalCount}: ${file.name}`)
 
     try {
       // Stage 1: Validation (0-10%)
       console.log('Validating file...')
-      setUploadProgress(10)
+      const baseProgress = (fileIndex / totalCount) * 100
+      const fileProgress = 100 / totalCount
+      setUploadProgress(Math.round(baseProgress + fileProgress * 0.1))
 
       // Stage 2: Base64 conversion (10-30%)
       console.log('Converting PDF to base64...')
@@ -126,7 +114,7 @@ export default function Dashboard() {
         reader.readAsDataURL(file)
       })
 
-      setUploadProgress(30)
+      setUploadProgress(Math.round(baseProgress + fileProgress * 0.3))
 
       // Stage 3: Uploading to server (30-70%)
       console.log('Uploading PDF to API...')
@@ -137,14 +125,14 @@ export default function Dashboard() {
 
         xhr.upload.addEventListener('progress', (e) => {
           if (e.lengthComputable) {
-            const percentComplete = 30 + (e.loaded / e.total) * 40
+            const percentComplete = baseProgress + fileProgress * (0.3 + (e.loaded / e.total) * 0.4)
             setUploadProgress(Math.round(percentComplete))
           }
         })
 
         xhr.addEventListener('load', () => {
           // Stage 4: Processing on server (70-100%)
-          setUploadProgress(70)
+          setUploadProgress(Math.round(baseProgress + fileProgress * 0.7))
           if (xhr.status >= 200 && xhr.status < 300) {
             try {
               const data = JSON.parse(xhr.responseText)
@@ -181,18 +169,110 @@ export default function Dashboard() {
       console.log('Upload response status:', response.status)
       console.log('Upload response data:', response.data)
 
-      if (response.ok) {
-        // Complete processing stage (70-100%)
-        setUploadProgress(100)
+      // Complete this file's progress
+      setUploadProgress(Math.round(baseProgress + fileProgress))
 
+      if (response.ok) {
+        return {
+          fileName: file.name,
+          success: true,
+          questions: response.data.questions || 0,
+          message: `Thành công! Đã trích xuất ${response.data.questions || 0} câu hỏi.`
+        }
+      } else {
+        return {
+          fileName: file.name,
+          success: false,
+          message: response.data.message || 'Tải lên thất bại.'
+        }
+      }
+    } catch (error) {
+      console.error('Upload error:', error)
+      return {
+        fileName: file.name,
+        success: false,
+        message: error.message || 'Không thể tải lên tệp.'
+      }
+    }
+  }
+
+  const handleFileSelect = async (event) => {
+    const files = Array.from(event.target.files)
+    if (files.length === 0) return
+
+    // Validate all files first
+    const invalidFiles = []
+    const validFiles = []
+
+    for (const file of files) {
+      // Validate file type
+      if (file.type !== 'application/pdf') {
+        invalidFiles.push({ name: file.name, reason: 'Không phải tệp PDF' })
+        continue
+      }
+
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        invalidFiles.push({ name: file.name, reason: 'Kích thước > 10MB' })
+        continue
+      }
+
+      validFiles.push(file)
+    }
+
+    // Show validation errors if any
+    if (invalidFiles.length > 0) {
+      const errorMsg = invalidFiles.map(f => `${f.name}: ${f.reason}`).join('; ')
+      setUploadStatus({
+        type: 'error',
+        message: `Có ${invalidFiles.length} tệp không hợp lệ: ${errorMsg}`
+      })
+
+      if (validFiles.length === 0) {
+        // Reset file input
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ''
+        }
+        return
+      }
+    }
+
+    setUploading(true)
+    setUploadProgress(0)
+    setUploadStatus(null)
+    setTotalFiles(validFiles.length)
+    setUploadResults([])
+
+    const results = []
+
+    try {
+      // Upload files sequentially
+      for (let i = 0; i < validFiles.length; i++) {
+        setCurrentFileIndex(i)
+        const result = await uploadSingleFile(validFiles[i], i, validFiles.length)
+        results.push(result)
+        setUploadResults([...results])
+      }
+
+      // Show final summary
+      const successCount = results.filter(r => r.success).length
+      const failCount = results.filter(r => !r.success).length
+      const totalQuestions = results.reduce((sum, r) => sum + (r.questions || 0), 0)
+
+      if (failCount === 0) {
         setUploadStatus({
           type: 'success',
-          message: `Tải lên thành công! Đã trích xuất ${response.data.questions || 0} câu hỏi.`
+          message: `Tải lên thành công ${successCount} tệp! Tổng cộng ${totalQuestions} câu hỏi đã được trích xuất.`
+        })
+      } else if (successCount === 0) {
+        setUploadStatus({
+          type: 'error',
+          message: `Tất cả ${failCount} tệp đều tải lên thất bại. Vui lòng thử lại.`
         })
       } else {
         setUploadStatus({
-          type: 'error',
-          message: response.data.message || 'Tải lên thất bại. Vui lòng thử lại.'
+          type: 'warning',
+          message: `Tải lên hoàn tất: ${successCount} thành công, ${failCount} thất bại. Tổng cộng ${totalQuestions} câu hỏi.`
         })
       }
     } catch (error) {
@@ -203,6 +283,8 @@ export default function Dashboard() {
       })
     } finally {
       setUploading(false)
+      setCurrentFileIndex(0)
+      setTotalFiles(0)
       // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
@@ -282,8 +364,8 @@ export default function Dashboard() {
         data: body
       }))
       
-      // Initialize examDoing to true for new exam
-      sessionStorage.setItem('examDoing', 'true')
+      // Don't set examDoing here - let the Exam page show countdown first
+      // sessionStorage will be empty, which triggers the countdown
 
       console.log('Exam created with ID:', examId)
 
@@ -402,13 +484,14 @@ export default function Dashboard() {
                   </div>
                   <div className="action-card-text">
                     <h3 className="action-card-title">Tải lên PDF (Chỉ quản trị viên)</h3>
-                    <p className="action-card-description">Tải lên tài liệu và đề thi</p>
+                    <p className="action-card-description">Tải lên một hoặc nhiều tệp PDF (tối đa 10MB/tệp)</p>
                   </div>
                 </div>
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept=".pdf"
+                  multiple
                   onChange={handleFileSelect}
                   style={{ display: 'none' }}
                 />
@@ -421,7 +504,11 @@ export default function Dashboard() {
                       />
                     </div>
                     <div className="upload-progress-text">
-                      <span>Đang tải lên...</span>
+                      <span>
+                        {totalFiles > 1
+                          ? `Đang tải tệp ${currentFileIndex + 1}/${totalFiles}...`
+                          : 'Đang tải lên...'}
+                      </span>
                       <span className="upload-progress-percent">{uploadProgress}%</span>
                     </div>
                   </div>

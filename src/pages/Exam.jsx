@@ -8,7 +8,7 @@ import QuestionsList from '../components/QuestionsList'
 import QuestionsContent from '../components/QuestionsContent'
 
 const EXAM_DURATION = 50 * 60 // 50 minutes in seconds
-const COUNTDOWN_DURATION = 3 // 10 seconds countdown before exam starts
+const COUNTDOWN_DURATION = 5 // 10 seconds countdown before exam starts
 
 function Exam() {
   const [searchParams] = useSearchParams()
@@ -33,6 +33,7 @@ function Exam() {
   const [notified1Min, setNotified1Min] = useState(false)
   const hasLoadedRef = useRef(false)
   const isNavigatingAway = useRef(false)
+  const hasInitialized = useRef(false)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -114,18 +115,29 @@ function Exam() {
             }
 
             if (savedExamDoing === 'true') {
-              setExamDoing(true)
-              // Restore time remaining only if exam is doing
+              console.log('Resuming exam - examDoing was true')
+              // Don't set examDoing here, it will be set after initialization
+              // Just restore time remaining
               const savedTimeRemaining = sessionStorage.getItem('examTimeRemaining')
               if (savedTimeRemaining) {
                 setTimeRemaining(parseInt(savedTimeRemaining))
               }
-            } else {
-              // First time loading - show countdown
+              // Set a flag to skip countdown and start exam immediately after init
+              setTimeout(() => {
+                setExamDoing(true)
+              }, 100)
+            } else if (!savedExamDoing) {
+              // First time loading - show countdown (only if savedExamDoing is null/undefined)
+              console.log('Starting countdown before exam... savedExamDoing:', savedExamDoing)
+              console.log('Setting countdown to:', COUNTDOWN_DURATION)
               setCountdown(COUNTDOWN_DURATION)
+              console.log('Countdown state set')
+            } else {
+              console.log('savedExamDoing is:', savedExamDoing, 'type:', typeof savedExamDoing)
             }
 
             console.log('Exam loaded from session storage. ID:', examObj.id)
+            console.log('State after loading - countdown:', countdown, 'examDoing:', examDoing, 'loading:', loading)
           } else {
             setError('Invalid exam ID or exam not found')
           }
@@ -138,8 +150,15 @@ function Exam() {
       }
 
       setLoading(false)
+      // Mark as initialized after loading is complete
+      setTimeout(() => {
+        hasInitialized.current = true
+      }, 0)
     } else {
       setLoading(false)
+      setTimeout(() => {
+        hasInitialized.current = true
+      }, 0)
     }
   }, [searchParams])
 
@@ -157,9 +176,12 @@ function Exam() {
     }
   }, [timeRemaining, examDoing])
 
-  // Save exam doing state
+  // Save exam doing state (only after initialization to avoid overwriting on mount)
   useEffect(() => {
-    sessionStorage.setItem('examDoing', examDoing.toString())
+    if (hasInitialized.current) {
+      sessionStorage.setItem('examDoing', examDoing.toString())
+      console.log('Saved examDoing to sessionStorage:', examDoing.toString())
+    }
   }, [examDoing])
 
   // Timer countdown
@@ -185,11 +207,15 @@ function Exam() {
 
   // Countdown timer before exam starts
   useEffect(() => {
+    console.log('Countdown effect triggered. countdown:', countdown)
     if (countdown === null || countdown <= 0) return
 
+    console.log('Starting countdown timer...')
     const timer = setInterval(() => {
       setCountdown(prev => {
+        console.log('Countdown tick:', prev)
         if (prev <= 1) {
+          console.log('Countdown finished! Starting exam...')
           clearInterval(timer)
           setExamDoing(true)
           return 0
@@ -198,7 +224,10 @@ function Exam() {
       })
     }, 1000)
 
-    return () => clearInterval(timer)
+    return () => {
+      console.log('Cleaning up countdown timer')
+      clearInterval(timer)
+    }
   }, [countdown])
 
   // Check for time milestone notifications
