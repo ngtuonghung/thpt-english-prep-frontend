@@ -8,7 +8,7 @@ import QuestionsList from '../components/QuestionsList'
 import QuestionsContent from '../components/QuestionsContent'
 
 const EXAM_DURATION = 50 * 60 // 50 minutes in seconds
-const COUNTDOWN_DURATION = 5 // 10 seconds countdown before exam starts
+const COUNTDOWN_DURATION = 3 // 10 seconds countdown before exam starts
 
 function Exam() {
   const [searchParams] = useSearchParams()
@@ -450,7 +450,7 @@ function Exam() {
         },
         body: JSON.stringify({
           user_id: userInfo.sub,
-          examData,
+          quiz_id: examData.quiz_id,
           answers,
           examStartTime,
         }),
