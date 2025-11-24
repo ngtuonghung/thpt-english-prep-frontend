@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
+import { useNavigate, Navigate, useSearchParams } from 'react-router-dom'
 import './Submission.css'
 import TopBar from '../components/TopBar'
 import QuestionsList from '../components/QuestionsList'
@@ -8,6 +8,7 @@ const API_BASE = 'https://hrj5qc8u76.execute-api.ap-southeast-1.amazonaws.com/pr
 const CHAT_API = 'https://e9hi4aqre3.execute-api.ap-southeast-1.amazonaws.com/v2/chat'
 
 function Submission() {
+  const [searchParams] = useSearchParams()
   const [user, setUser] = useState(null)
   const [userInfo, setUserInfo] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -16,6 +17,7 @@ function Submission() {
   const [chatInput, setChatInput] = useState('')
   const navigate = useNavigate()
   const chatMessagesRef = useRef(null)
+  const chatInputRef = useRef(null)
 
   const [examData, setExamData] = useState(null)
   const [answers, setAnswers] = useState(null)
@@ -34,45 +36,114 @@ function Submission() {
       }
     }
 
+    // Get exam ID from URL parameter
+    const urlExamId = searchParams.get('id')
+
+    // Redirect if no exam ID in URL
+    if (!urlExamId) {
+      console.warn('No exam ID in URL parameter')
+      navigate('/dashboard')
+      return
+    }
+
     const savedExam = sessionStorage.getItem('currentExam');
     const savedAnswers = sessionStorage.getItem('examAnswers');
     const savedStartTime = sessionStorage.getItem('examStartTime');
     const savedFinishTime = sessionStorage.getItem('examFinishTime');
 
-    if (savedExam && savedAnswers) {
+    // Redirect if no session data
+    if (!savedExam || !savedAnswers) {
+      console.warn('No exam data found in session storage for submission page.')
+      navigate('/dashboard')
+      return
+    }
+
+    try {
+      const parsedExam = JSON.parse(savedExam);
+      
+      // Verify exam ID matches URL parameter
+      if (urlExamId && parsedExam.id.toString() !== urlExamId) {
+        console.warn('Exam ID mismatch')
+        navigate('/dashboard')
+        return
+      }
+
+      setExamData(parsedExam.data);
+      setAnswers(JSON.parse(savedAnswers));
+      if (savedStartTime) {
+        setExamStartTime(new Date(savedStartTime));
+      }
+      if (savedFinishTime) {
+        setExamFinishTime(new Date(savedFinishTime));
+      } else {
+        // Fallback: Set finish time to now if not stored
+        setExamFinishTime(new Date());
+      }
+
+      // Load chat sessions from sessionStorage
+      const savedChatSessions = sessionStorage.getItem('chatSessions');
+      if (savedChatSessions) {
         try {
-            const parsedExam = JSON.parse(savedExam);
-            setExamData(parsedExam.data);
-            setAnswers(JSON.parse(savedAnswers));
-            if (savedStartTime) {
-                setExamStartTime(new Date(savedStartTime));
-            }
-            if (savedFinishTime) {
-                setExamFinishTime(new Date(savedFinishTime));
-            } else {
-                // Fallback: Set finish time to now if not stored
-                setExamFinishTime(new Date());
-            }
+          const parsedSessions = JSON.parse(savedChatSessions);
+          // Convert timestamp strings back to Date objects
+          Object.keys(parsedSessions).forEach(questionId => {
+            parsedSessions[questionId].messages = parsedSessions[questionId].messages.map(msg => ({
+              ...msg,
+              timestamp: new Date(msg.timestamp)
+            }));
+          });
+          setChatSessions(parsedSessions);
         } catch (error) {
-            console.error("Failed to parse exam/answer data from session storage", error);
-            navigate('/dashboard');
-            return;
+          console.error('Failed to parse chat sessions from session storage', error);
         }
-    } else {
-        console.warn("No exam data found in session storage for submission page.");
-        navigate('/dashboard');
-        return;
+      }
+    } catch (error) {
+      console.error("Failed to parse exam/answer data from session storage", error);
+      navigate('/dashboard');
+      return;
     }
+    
     setLoading(false)
-  }, [navigate])
+  }, [navigate, searchParams])
 
 
-  // Auto-scroll chat messages to bottom
+  // Auto-scroll chat messages to bottom only when messages change
   useEffect(() => {
-    if (chatMessagesRef.current) {
-      chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight
+    if (chatMessagesRef.current && activeChatQuestion && chatSessions[activeChatQuestion]) {
+      // Use requestAnimationFrame for smoother scrolling
+      requestAnimationFrame(() => {
+        if (chatMessagesRef.current) {
+          chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight
+        }
+      })
     }
-  }, [chatSessions, activeChatQuestion])
+  }, [chatSessions[activeChatQuestion]?.messages.length, activeChatQuestion])
+
+  // Save chat sessions to sessionStorage with debounce to avoid lag
+  useEffect(() => {
+    if (Object.keys(chatSessions).length > 0) {
+      const timeoutId = setTimeout(() => {
+        // Filter out initial prompt messages and empty sessions before saving
+        const sessionsToSave = {};
+        Object.keys(chatSessions).forEach(questionId => {
+          const realMessages = chatSessions[questionId].messages.filter(msg => !msg.isInitialPrompt);
+          // Only save if there are real messages (user has sent at least one message)
+          if (realMessages.length > 0) {
+            sessionsToSave[questionId] = {
+              messages: realMessages
+            };
+          }
+        });
+        
+        // Only save to sessionStorage if there are sessions with real messages
+        if (Object.keys(sessionsToSave).length > 0) {
+          sessionStorage.setItem('chatSessions', JSON.stringify(sessionsToSave));
+        }
+      }, 500); // Debounce 500ms
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [chatSessions])
 
   const formatDateTime = (date) => {
     if (!date) return ''
@@ -117,15 +188,21 @@ function Submission() {
         [questionId]: {
           messages: [
             {
-              id: 1,
+              id: 0,
               sender: 'ai',
-              text: '👋 Xin chào! Tôi là trợ lý AI của bạn.\n\n💡 Tôi có thể giúp bạn:\n• Giải thích đáp án chi tiết\n• Phân tích các lựa chọn khác\n• Cung cấp kiến thức bổ sung\n\nHãy hỏi tôi bất cứ điều gì về câu hỏi này nhé! 😊',
-              timestamp: new Date()
+              text: 'Bạn muốn hỏi gì?',
+              timestamp: new Date(),
+              isInitialPrompt: true // Mark as initial prompt to exclude from storage
             }
           ]
         }
       }))
     }
+
+    // Focus input field after a short delay to allow animation
+    setTimeout(() => {
+      chatInputRef.current?.focus()
+    }, 400)
   }, [activeChatQuestion, chatSessions])
 
   const renderMarkdown = (text) => {
@@ -241,6 +318,11 @@ function Submission() {
     if (!chatInput.trim() || !activeChatQuestion) return
 
     const currentSession = chatSessions[activeChatQuestion] || { messages: [] }
+    
+    // Check if this is the first user message (only initial prompt exists or no messages)
+    const isFirstUserMessage = currentSession.messages.length === 0 || 
+      (currentSession.messages.length === 1 && currentSession.messages[0].isInitialPrompt)
+    
     const userMessage = {
       id: currentSession.messages.length + 1,
       sender: 'user',
@@ -259,55 +341,58 @@ function Submission() {
     const userQuestion = chatInput
     setChatInput('')
 
-    // Reset textarea height
-    setTimeout(() => {
-      const textarea = document.querySelector('.chat-input-area textarea')
-      if (textarea) {
-        textarea.style.height = 'auto'
-      }
-    }, 0)
-
     // Get current question data
     const currentQuestion = allQuestions.find(q => q.id === activeChatQuestion)
     if (!currentQuestion) return
 
     try {
-      // Add loading message
-      const loadingId = currentSession.messages.length + 2
-      setChatSessions(prev => ({
-        ...prev,
-        [activeChatQuestion]: {
-          messages: [
-            ...prev[activeChatQuestion].messages,
-            {
-              id: loadingId,
-              sender: 'ai',
-              text: '<div class="typing-indicator"><span></span><span></span><span></span></div>',
-              timestamp: new Date(),
-              loading: true
-            }
-          ]
-        }
-      }))
-
-      // Prepare request body
+      // Prepare request body with correct answer
       const userChoice = answers[activeChatQuestion]
+      const correctAnswer = currentQuestion.data.correct_answer
+      
+      // Get full context from the current question's context property
+      const fullContext = currentQuestion.context || ''
+      
       const requestBody = {
-        content: currentQuestion.data.content || currentQuestion.context || '',
+        context: fullContext,
+        content: currentQuestion.data.content || '',
         options: currentQuestion.data.options || [],
-        correct_answer: userChoice || 'A',
-        user_choice: userChoice || 'A',
-        user_question: userQuestion
+        correct_answer: correctAnswer,
+        user_choice: userChoice || '',
+        user_prompt: isFirstUserMessage ? userQuestion : ''
       }
 
       // Log request details to console
       console.log('=== Chat API Request ===')
+      console.log('Question ID:', activeChatQuestion)
+      console.log('Question Type:', currentQuestion.type)
+      console.log('Question Number:', currentQuestion.num)
+      console.log('Is First User Message:', isFirstUserMessage)
       console.log('URL:', CHAT_API)
       console.log('Headers:', {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${user.access_token}`
       })
       console.log('Body:', JSON.stringify(requestBody, null, 2))
+      console.log('================================================')
+
+      // Add thinking message
+      const thinkingId = currentSession.messages.length + 2
+      setChatSessions(prev => ({
+        ...prev,
+        [activeChatQuestion]: {
+          messages: [
+            ...prev[activeChatQuestion].messages,
+            {
+              id: thinkingId,
+              sender: 'ai',
+              text: 'Đang suy nghĩ...',
+              timestamp: new Date(),
+              loading: true
+            }
+          ]
+        }
+      }))
 
       // Call Chat API
       const response = await fetch(CHAT_API, {
@@ -319,45 +404,103 @@ function Submission() {
         body: JSON.stringify(requestBody)
       })
 
+      console.log('=== Chat API Response ===')
       console.log('Response Status:', response.status)
+      console.log('Response Headers:', Object.fromEntries(response.headers.entries()))
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`)
+        const errorText = await response.text()
+        console.error('Error Response Body:', errorText)
+        throw new Error(`API error: ${response.status} - ${errorText}`)
       }
 
       const data = await response.json()
       console.log('Response Data:', data)
+      console.log('========================')
 
-      // Parse response (handle different response formats)
+      // Parse response from Lambda
       let aiText = 'Xin lỗi, tôi không thể trả lời câu hỏi này.'
 
-      if (typeof data === 'string') {
-        aiText = data
-      } else if (data.body) {
-        aiText = typeof data.body === 'string' ? data.body : JSON.stringify(data.body)
-      } else if (data.explanation) {
-        aiText = data.explanation
-      } else if (data.response) {
+      if (data.response) {
+        // Standard response format from Lambda
         aiText = data.response
+      } else if (data.body) {
+        // If body is a string, try parsing it
+        try {
+          const bodyData = typeof data.body === 'string' ? JSON.parse(data.body) : data.body
+          aiText = bodyData.response || bodyData.message || JSON.stringify(bodyData)
+        } catch {
+          aiText = data.body
+        }
+      } else if (typeof data === 'string') {
+        aiText = data
       } else if (data.message) {
         aiText = data.message
+      } else {
+        console.warn('Unexpected response format:', data)
+        aiText = JSON.stringify(data, null, 2)
       }
 
-      // Update with actual response
+      console.log('Parsed AI Text:', aiText.substring(0, 200) + (aiText.length > 200 ? '...' : ''))
+
+      // Animate text token by token (like ChatGPT)
+      const words = aiText.split(' ')
+      let currentIndex = 0
+      
+      // Clear thinking message and start with empty text
       setChatSessions(prev => ({
         ...prev,
         [activeChatQuestion]: {
           messages: prev[activeChatQuestion].messages.map(msg =>
-            msg.id === loadingId
-              ? { ...msg, text: aiText, loading: false }
+            msg.id === thinkingId
+              ? { ...msg, text: '', loading: false, streaming: true }
               : msg
           )
         }
       }))
-    } catch (error) {
-      console.error('Chat API error:', error)
 
-      // Show error message
+      // Animate words appearing one by one
+      const animateText = () => {
+        if (currentIndex < words.length) {
+          const displayText = words.slice(0, currentIndex + 1).join(' ')
+          
+          setChatSessions(prev => ({
+            ...prev,
+            [activeChatQuestion]: {
+              messages: prev[activeChatQuestion].messages.map(msg =>
+                msg.id === thinkingId
+                  ? { ...msg, text: displayText }
+                  : msg
+              )
+            }
+          }))
+          
+          currentIndex++
+          // Adjust speed: faster streaming effect
+          setTimeout(animateText, 25)
+        } else {
+          // Mark streaming as complete
+          setChatSessions(prev => ({
+            ...prev,
+            [activeChatQuestion]: {
+              messages: prev[activeChatQuestion].messages.map(msg =>
+                msg.id === thinkingId
+                  ? { ...msg, streaming: false }
+                  : msg
+              )
+            }
+          }))
+        }
+      }
+      
+      animateText()
+    } catch (error) {
+      console.error('=== Chat API Error ===')
+      console.error('Error:', error)
+      console.error('Error Message:', error.message)
+      console.error('======================')
+
+      // Replace thinking message with error
       setChatSessions(prev => ({
         ...prev,
         [activeChatQuestion]: {
@@ -375,21 +518,16 @@ function Submission() {
     }
   }, [chatInput, activeChatQuestion, chatSessions, allQuestions, answers, user])
 
-  const handleKeyPress = (e) => {
+  const handleKeyPress = useCallback((e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSendMessage()
     }
-  }
+  }, [handleSendMessage])
 
-  const handleTextareaChange = (e) => {
+  const handleTextareaChange = useCallback((e) => {
     setChatInput(e.target.value)
-
-    // Auto-resize textarea
-    const textarea = e.target
-    textarea.style.height = 'auto'
-    textarea.style.height = Math.min(textarea.scrollHeight, 168) + 'px'
-  }
+  }, [])
 
   const renderQuestion = useCallback((question) => {
     const questionId = question.id
@@ -432,12 +570,6 @@ function Submission() {
             </svg>
           </button>
         </div>
-
-        {question.context && question.isFirstInGroup && (
-          <div className="group-context">
-            <p className="context-text" dangerouslySetInnerHTML={renderMarkdown(question.context)} />
-          </div>
-        )}
 
         {question.data.content && (
           <p
@@ -485,7 +617,50 @@ function Submission() {
         </div>
       </div>
     )
-  }, [answers, activeChatQuestion, handleChatBubbleClick, allQuestions])
+  }, [answers, activeChatQuestion, handleChatBubbleClick, renderMarkdown])
+
+  const renderContextWithQuestions = useCallback((questions) => {
+    // Group questions by their group (based on context and type)
+    const groupedQuestions = []
+    let currentGroup = null
+
+    questions.forEach(question => {
+      if (question.isFirstInGroup) {
+        if (currentGroup) {
+          groupedQuestions.push(currentGroup)
+        }
+        currentGroup = {
+          context: question.context,
+          type: question.type,
+          questions: [question]
+        }
+      } else if (currentGroup) {
+        currentGroup.questions.push(question)
+      } else {
+        // Shouldn't happen, but handle it
+        currentGroup = {
+          context: null,
+          type: question.type,
+          questions: [question]
+        }
+      }
+    })
+
+    if (currentGroup) {
+      groupedQuestions.push(currentGroup)
+    }
+
+    return groupedQuestions.map((group, groupIdx) => (
+      <div key={`group-${groupIdx}`} className="question-group">
+        {group.context && (
+          <div className="group-context">
+            <p className="context-text" dangerouslySetInnerHTML={renderMarkdown(group.context)} />
+          </div>
+        )}
+        {group.questions.map(question => renderQuestion(question))}
+      </div>
+    ))
+  }, [renderMarkdown, renderQuestion])
 
   const handleBackToDashboard = () => {
     // Clear all exam and submission related storage
@@ -496,6 +671,7 @@ function Submission() {
     sessionStorage.removeItem('examTimeRemaining');
     sessionStorage.removeItem('examStarted');
     sessionStorage.removeItem('examDoing');
+    sessionStorage.removeItem('chatSessions');
     navigate('/dashboard');
   };
 
@@ -582,7 +758,7 @@ function Submission() {
           {/* Questions Content */}
           <div className="submission-content">
             {/* Questions List */}
-            {allQuestions.map((question, index) => renderQuestion(question, index))}
+            {renderContextWithQuestions(allQuestions)}
           </div>
 
           {/* Chat Pane - Always rendered, visibility controlled by CSS */}
@@ -608,31 +784,46 @@ function Submission() {
 
             <div className="chat-messages" ref={chatMessagesRef}>
               {currentChatSession?.messages.map(message => (
-                <div key={message.id} className={`chat-message ${message.sender}`}>
-                  <div className="message-avatar">
-                    {message.sender === 'ai' ? '🤖' : '👤'}
-                  </div>
-                  <div className="message-content">
-                    <div
-                      className={`message-text ${message.loading ? 'loading' : ''}`}
-                      dangerouslySetInnerHTML={{ __html: message.text }}
-                    />
-                    <div className="message-time">
-                      {message.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                message.sender === 'user' ? (
+                  <div key={message.id} className={`chat-message ${message.sender}`}>
+                    <div className="message-avatar">
+                      👤
+                    </div>
+                    <div className="message-content">
+                      <div
+                        className="message-text"
+                        dangerouslySetInnerHTML={{ __html: message.text }}
+                      />
+                      <div className="message-time">
+                        {message.timestamp.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  <div key={message.id} className="ai-response-text">
+                    {message.loading ? (
+                      <div className="thinking-text">
+                        Đang suy nghĩ<span className="thinking-dots"></span>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{ display: 'inline' }} dangerouslySetInnerHTML={{ __html: message.text }} />
+                        {message.streaming && <span className="streaming-cursor">▊</span>}
+                      </>
+                    )}
+                  </div>
+                )
               ))}
             </div>
 
             <div className="chat-input-area">
               <div className="chat-input-wrapper">
                 <textarea
+                  ref={chatInputRef}
                   value={chatInput}
                   onChange={handleTextareaChange}
                   onKeyDown={handleKeyPress}
                   placeholder="Nhập câu hỏi... (Enter: gửi, Shift+Enter: xuống dòng)"
-                  rows={1}
                 />
                 <button
                   onClick={handleSendMessage}

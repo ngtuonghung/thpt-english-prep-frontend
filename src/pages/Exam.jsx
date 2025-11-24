@@ -445,8 +445,8 @@ function Exam() {
       // Set flag to allow navigation
       isNavigatingAway.current = true
 
-      // Navigate to submission page with exam data and answers
-      navigate('/submission', {
+      // Navigate to submission page with exam ID parameter
+      navigate(`/submission?id=${examId}`, {
         state: {
           examData,
           answers,
@@ -751,14 +751,16 @@ function Exam() {
 
                     return (
                       <div key={group.id} className="question-group">
-                        <div className="group-context">
-                          <p className="context-text" dangerouslySetInnerHTML={renderMarkdown(group.context)} />
-                        </div>
+                        {group.context && (
+                          <div className="group-context">
+                            <p className="context-text" dangerouslySetInnerHTML={renderMarkdown(group.context)} />
+                          </div>
+                        )}
                         {group.subquestions.map((subq, subIdx) => {
                           const currentQuestionNum = questionNum + subIdx + 1
                           const questionId = `${group.id}-${subIdx}`
                           return (
-                            <div key={subIdx} id={`question-${currentQuestionNum}`} className="sub-question">
+                            <div key={questionId} id={`question-${currentQuestionNum}`} className="sub-question">
                               <div className="question-header">
                                 <span className="question-number">Câu {currentQuestionNum}</span>
                               </div>
@@ -822,7 +824,7 @@ function Exam() {
                           const currentQuestionNum = questionNum + subIdx + 1
                           const questionId = `${group.id}-${subIdx}`
                           return (
-                            <div key={subIdx} id={`question-${currentQuestionNum}`} className="sub-question">
+                            <div key={questionId} id={`question-${currentQuestionNum}`} className="sub-question">
                               <div className="question-header">
                                 <span className="question-number">Câu {currentQuestionNum}</span>
                               </div>
@@ -887,14 +889,16 @@ function Exam() {
 
                     return (
                       <div key={group.id} className="question-group">
-                        <div className="group-context">
-                          <p className="context-text" dangerouslySetInnerHTML={renderMarkdown(group.context)} />
-                        </div>
+                        {group.context && (
+                          <div className="group-context">
+                            <p className="context-text" dangerouslySetInnerHTML={renderMarkdown(group.context)} />
+                          </div>
+                        )}
                         {group.subquestions.map((subq, subIdx) => {
                           const currentQuestionNum = questionNum + subIdx + 1
                           const questionId = `${group.id}-${subIdx}`
                           return (
-                            <div key={subIdx} id={`question-${currentQuestionNum}`} className="sub-question">
+                            <div key={questionId} id={`question-${currentQuestionNum}`} className="sub-question">
                               <div className="question-header">
                                 <span className="question-number">Câu {currentQuestionNum}</span>
                               </div>
@@ -963,14 +967,16 @@ function Exam() {
 
                     return (
                       <div key={group.id} className="question-group">
-                        <div className="group-context reading-context">
-                          <p className="context-text" dangerouslySetInnerHTML={renderMarkdown(group.context)} />
-                        </div>
+                        {group.context && (
+                          <div className="group-context reading-context">
+                            <p className="context-text" dangerouslySetInnerHTML={renderMarkdown(group.context)} />
+                          </div>
+                        )}
                         {group.subquestions.map((subq, subIdx) => {
                           const currentQuestionNum = questionNum + subIdx + 1
                           const questionId = `${group.id}-${subIdx}`
                           return (
-                            <div key={subIdx} id={`question-${currentQuestionNum}`} className="sub-question">
+                            <div key={questionId} id={`question-${currentQuestionNum}`} className="sub-question">
                               <div className="question-header">
                                 <span className="question-number">Câu {currentQuestionNum}</span>
                               </div>
