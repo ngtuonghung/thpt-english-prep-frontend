@@ -686,7 +686,7 @@ function Exam() {
       <TopBar userInfo={userInfo} hideLogout={true} />
 
       {/* TEST BUTTON - Remove in production */}
-      {examDoing && (
+      {/* {examDoing && (
         <div style={{
           position: 'fixed',
           top: '70px',
@@ -703,7 +703,7 @@ function Exam() {
         }} onClick={selectAllC}>
           TEST: Select All C
         </div>
-      )}
+      )} */}
 
       {/* Notification */}
       {notification && (
