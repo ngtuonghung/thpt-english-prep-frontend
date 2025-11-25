@@ -141,8 +141,18 @@ function Submission() {
       setAnswers(user_answers || {})
       setExamStartTime(new Date(exam_info.exam_start_time))
       setExamFinishTime(new Date(exam_info.exam_finish_time))
-      
+
+      // Save to sessionStorage to avoid re-fetching on refresh
+      sessionStorage.setItem('currentExam', JSON.stringify({
+        id: examId,
+        data: reconstructedExamData
+      }))
+      sessionStorage.setItem('examAnswers', JSON.stringify(user_answers || {}))
+      sessionStorage.setItem('examStartTime', exam_info.exam_start_time)
+      sessionStorage.setItem('examFinishTime', exam_info.exam_finish_time)
+
       console.log('Successfully reconstructed exam from database')
+      console.log('Saved exam data to sessionStorage')
       setFetchingFromDatabase(false)
       setLoading(false)
 

@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import './ExamHistory.css'
 
 const API_BASE = 'https://hrj5qc8u76.execute-api.ap-southeast-1.amazonaws.com/prod'
 
 export default function ExamHistory({ accessToken, onLoadingChange }) {
+  const navigate = useNavigate()
   const [examHistory, setExamHistory] = useState([])
   const [loading, setLoading] = useState(false)
 
@@ -149,7 +151,10 @@ export default function ExamHistory({ accessToken, onLoadingChange }) {
                     </svg>
                     <span>Làm lại</span>
                   </button>
-                  <button className="btn-history-action btn-review">
+                  <button
+                    className="btn-history-action btn-review"
+                    onClick={() => navigate(`/submission?id=${exam.exam_id}`)}
+                  >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                       <circle cx="12" cy="12" r="3"></circle>
