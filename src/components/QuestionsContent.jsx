@@ -127,36 +127,22 @@ function QuestionsContent({
 
     return (
       <div key={questionId} id={`question-${question.num}`} className="sub-question">
+        {isSubmissionMode && onChatBubbleClick && (
+          <button
+            className={`chat-toggle-btn ${activeChatQuestion === questionId ? 'active' : ''}`}
+            onClick={() => onChatBubbleClick(questionId)}
+            title="Chat với AI về câu hỏi này"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span>Hỏi AI</span>
+          </button>
+        )}
         <div className="question-header">
           <div>
             <span className="question-number">Câu {question.num}</span>
           </div>
-          {isSubmissionMode && onChatBubbleClick && (
-            <button
-              className={`chat-bubble-btn ${activeChatQuestion === questionId ? 'active' : ''}`}
-              onClick={() => onChatBubbleClick(questionId)}
-              title="Chat với AI về câu hỏi này"
-            >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                {/* Robot head */}
-                <rect x="6" y="8" width="12" height="10" rx="2" ry="2"></rect>
-                {/* Antenna */}
-                <line x1="12" y1="8" x2="12" y2="5"></line>
-                <circle cx="12" cy="4" r="1" fill="currentColor"></circle>
-                {/* Eyes */}
-                <line x1="9.5" y1="12" x2="9.5" y2="14"></line>
-                <line x1="14.5" y1="12" x2="14.5" y2="14"></line>
-                {/* Ears */}
-                <path d="M6 11 L4 11 C3.5 11 3 11.5 3 12 L3 14 C3 14.5 3.5 15 4 15 L6 15"></path>
-                <path d="M18 11 L20 11 C20.5 11 21 11.5 21 12 L21 14 C21 14.5 20.5 15 20 15 L18 15"></path>
-                {/* Chat bubble */}
-                <circle cx="18" cy="7" r="3.5"></circle>
-                <circle cx="17" cy="6.5" r="0.5" fill="currentColor"></circle>
-                <circle cx="18" cy="6.5" r="0.5" fill="currentColor"></circle>
-                <circle cx="19" cy="6.5" r="0.5" fill="currentColor"></circle>
-              </svg>
-            </button>
-          )}
         </div>
 
         {questionData.content && (
@@ -307,7 +293,6 @@ function QuestionsContent({
       {questionsByType.fill_short.length > 0 && (
         <div className="question-section">
           <h2 className="section-title">
-            <span className="section-number">Phần 1</span>
             Điền từ ngắn
           </h2>
           {renderQuestionsWithContext(questionsByType.fill_short)}
@@ -318,7 +303,6 @@ function QuestionsContent({
       {questionsByType.reorder.length > 0 && (
         <div className="question-section">
           <h2 className="section-title">
-            <span className="section-number">Phần 2</span>
             Sắp xếp câu
           </h2>
           {renderQuestionsWithContext(questionsByType.reorder)}
@@ -329,7 +313,6 @@ function QuestionsContent({
       {questionsByType.fill_long.length > 0 && (
         <div className="question-section">
           <h2 className="section-title">
-            <span className="section-number">Phần 3</span>
             Điền câu
           </h2>
           {renderQuestionsWithContext(questionsByType.fill_long)}
@@ -340,7 +323,6 @@ function QuestionsContent({
       {questionsByType.reading.length > 0 && (
         <div className="question-section">
           <h2 className="section-title">
-            <span className="section-number">Phần 4</span>
             Đọc hiểu
           </h2>
           {renderQuestionsWithContext(questionsByType.reading)}

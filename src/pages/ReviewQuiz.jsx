@@ -324,31 +324,36 @@ export default function ReviewQuiz() {
                       >
                         <option value="vocabulary">Vocabulary - Từ vựng</option>
                         <option value="grammar">Grammar - Ngữ pháp</option>
-                        <option value="reading">Reading Comprehension - Đọc hiểu</option>
-                        <option value="sentence_structure">Sentence Structure - Cấu trúc câu</option>
-                        <option value="idioms">Idioms & Phrases - Thành ngữ</option>
-                        <option value="prepositions">Prepositions - Giới từ</option>
-                        <option value="tenses">Tenses - Thì</option>
+                        <option value="tenses">Tenses - Các thì</option>
                         <option value="conditionals">Conditionals - Câu điều kiện</option>
-                        <option value="reported_speech">Reported Speech - Câu tường thuật</option>
                         <option value="passive_voice">Passive Voice - Câu bị động</option>
-                        <option value="articles">Articles - Mạo từ</option>
+                        <option value="reported_speech">Reported Speech - Câu gián tiếp</option>
                         <option value="modal_verbs">Modal Verbs - Động từ khuyết thiếu</option>
+                        <option value="phrasal_verbs">Phrasal Verbs - Cụm động từ</option>
+                        <option value="prepositions">Prepositions - Giới từ</option>
                       </select>
                     </div>
 
                     <div className="form-group">
-                      <label htmlFor="question-type">Loại câu hỏi</label>
+                      <label htmlFor="question-type">Dạng câu hỏi</label>
                       <select
                         id="question-type"
                         value={aiConfig.question_type}
                         onChange={(e) => handleAiConfigChange('question_type', e.target.value)}
                         className="form-select"
                       >
-                        <option value="fill_short">Fill in the Blank - Điền khuyết</option>
-                        <option value="multiple_choice">Multiple Choice - Trắc nghiệm</option>
-                        <option value="rearrange">Sentence Rearrangement - Sắp xếp câu</option>
-                        <option value="reading">Reading Comprehension - Đọc hiểu</option>
+                        <option value="fill_blank">Điền từ vào chỗ trống</option>
+                        <option value="choose_best">Chọn đáp án đúng nhất</option>
+                        <option value="error_identification">Tìm lỗi sai</option>
+                        <option value="sentence_rewrite">Viết lại câu đồng nghĩa</option>
+                        <option value="word_form">Chọn dạng từ phù hợp</option>
+                        <option value="closest_meaning">Tìm từ gần nghĩa nhất</option>
+                        <option value="opposite_meaning">Tìm từ trái nghĩa</option>
+                        <option value="dialogue_response">Chọn câu trả lời phù hợp trong hội thoại</option>
+                        <option value="main_idea">Tìm ý chính của đoạn văn</option>
+                        <option value="detail_question">Câu hỏi chi tiết về đoạn văn</option>
+                        <option value="inference">Suy luận từ đoạn văn</option>
+                        <option value="reference">Tìm từ thay thế trong đoạn văn</option>
                       </select>
                     </div>
                   </div>
@@ -365,11 +370,36 @@ export default function ReviewQuiz() {
                         <option value="general">General - Tổng quát</option>
                         <option value="business">Business English - Tiếng Anh thương mại</option>
                         <option value="academic">Academic English - Tiếng Anh học thuật</option>
+                        <option value="academy_research">Academic Research - Nghiên cứu khoa học</option>
                         <option value="daily">Daily Conversation - Hội thoại hàng ngày</option>
                         <option value="travel">Travel & Tourism - Du lịch</option>
                         <option value="technology">Technology & Science - Công nghệ & Khoa học</option>
+                        <option value="technical">Technical - Kỹ thuật chuyên sâu</option>
+                        <option value="cyber_security">Cyber Security - An ninh mạng</option>
                         <option value="health">Health & Lifestyle - Sức khỏe & Lối sống</option>
                         <option value="education">Education - Giáo dục</option>
+                        <option value="environment">Environment - Môi trường</option>
+                        <option value="culture">Culture & Society - Văn hóa & Xã hội</option>
+                        <option value="sports">Sports & Fitness - Thể thao & Thể dục</option>
+                        <option value="entertainment">Entertainment & Media - Giải trí & Truyền thông</option>
+                        <option value="food">Food & Cooking - Ẩm thực & Nấu ăn</option>
+                        <option value="shopping">Shopping & Fashion - Mua sắm & Thời trang</option>
+                        <option value="work">Work & Career - Công việc & Nghề nghiệp</option>
+                        <option value="family">Family & Relationships - Gia đình & Quan hệ</option>
+                        <option value="housing">Housing & Living - Nhà ở & Sinh hoạt</option>
+                        <option value="transportation">Transportation - Giao thông vận tải</option>
+                        <option value="finance">Finance & Economy - Tài chính & Kinh tế</option>
+                        <option value="history">History - Lịch sử</option>
+                        <option value="geography">Geography - Địa lý</option>
+                        <option value="art">Art & Literature - Nghệ thuật & Văn học</option>
+                        <option value="politics">Politics & Law - Chính trị & Luật pháp</option>
+                        <option value="psychology">Psychology - Tâm lý học</option>
+                        <option value="communication">Communication - Giao tiếp</option>
+                        <option value="social_media">Social Media - Mạng xã hội</option>
+                        <option value="nature">Nature & Wildlife - Thiên nhiên & Động vật hoang dã</option>
+                        <option value="weather">Weather & Climate - Thời tiết & Khí hậu</option>
+                        <option value="hobbies">Hobbies & Interests - Sở thích</option>
+                        <option value="festivals">Festivals & Celebrations - Lễ hội & Kỷ niệm</option>
                       </select>
                     </div>
 
@@ -429,30 +459,6 @@ export default function ReviewQuiz() {
                   mode="submission"
                   onAnswerSelect={handleAiSelect}
                 />
-              )}
-
-              {!generatingAI && aiQuestions.length > 0 && (
-                <footer className="review-footer">
-                  <div className="footer-left">
-                    <p className="answered-counter">Đã trả lời {aiAnsweredCount}/{aiQuestions.length} câu</p>
-                  </div>
-                  <div className="footer-actions">
-                    <button
-                      className="btn-outline"
-                      onClick={() => {
-                        setAiQuestions([])
-                        setAiAnswers({})
-                        // Clear session storage when resetting
-                        sessionStorage.removeItem('aiQuestions')
-                        sessionStorage.removeItem('aiAnswers')
-                        sessionStorage.removeItem('aiConfig')
-                      }}
-                      disabled={generatingAI}
-                    >
-                      Xóa & Tạo mới
-                    </button>
-                  </div>
-                </footer>
               )}
           </section>
         </div>

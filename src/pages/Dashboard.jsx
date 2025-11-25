@@ -418,15 +418,15 @@ export default function Dashboard() {
                   </svg>
                 </div>
                 <div className="action-card-text">
-                  <h3 className="action-card-title">Ôn tập nhanh</h3>
-                  <p className="action-card-description">Sinh 5 câu hỏi review dựa trên lịch sử trả lời sai</p>
+                  <h3 className="action-card-title">Ôn tập với AI</h3>
+                  <p className="action-card-description">Tạo câu hỏi luyện tập tùy chỉnh với AI thông minh</p>
                 </div>
               </div>
               <button
                 className="btn-action-modern"
                 onClick={handleReviewQuiz}
               >
-                <span>Bắt đầu ôn tập</span>
+                <span>Bắt đầu</span>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="5" y1="12" x2="19" y2="12"></line>
                   <polyline points="12 5 19 12 12 19"></polyline>
@@ -443,8 +443,8 @@ export default function Dashboard() {
                   </svg>
                 </div>
                 <div className="action-card-text">
-                  <h3 className="action-card-title">Tạo đề thi</h3>
-                  <p className="action-card-description">Bắt đầu tạo đề thi mới cho học sinh của bạn</p>
+                  <h3 className="action-card-title">Làm đề thi</h3>
+                  <p className="action-card-description">Làm đề thi 40 câu với thời gian 50 phút</p>
                 </div>
               </div>
               <button
@@ -483,8 +483,8 @@ export default function Dashboard() {
                     </svg>
                   </div>
                   <div className="action-card-text">
-                    <h3 className="action-card-title">Tải lên PDF (Chỉ quản trị viên)</h3>
-                    <p className="action-card-description">Tải lên một hoặc nhiều tệp PDF (tối đa 10MB/tệp)</p>
+                    <h3 className="action-card-title">Tải đề lên hệ thống</h3>
+                    <p className="action-card-description">Tải file PDF đề thi lên (Tối đa 10MB/file)</p>
                   </div>
                 </div>
                 <input

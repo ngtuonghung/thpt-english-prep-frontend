@@ -25,6 +25,7 @@ function Exam() {
   const [showSubmitModal, setShowSubmitModal] = useState(false)
   const [showExitModal, setShowExitModal] = useState(false)
   const [showNavigationModal, setShowNavigationModal] = useState(false)
+  const [showLogoClickModal, setShowLogoClickModal] = useState(false)
   const [countdown, setCountdown] = useState(null) // Countdown before exam starts
   const [notification, setNotification] = useState(null) // {type, message}
   const [notified25Min, setNotified25Min] = useState(false)
@@ -322,6 +323,16 @@ function Exam() {
     const handleClick = (e) => {
       if (!examDoing || isNavigatingAway.current) return
 
+      // Check if click is on logo
+      const logo = e.target.closest('.logo')
+      if (logo) {
+        e.preventDefault()
+        e.stopPropagation()
+        e.stopImmediatePropagation()
+        setShowLogoClickModal(true)
+        return
+      }
+
       // Check if click is on a link or inside a link
       const link = e.target.closest('a')
       if (link && link.href) {
@@ -532,6 +543,29 @@ function Exam() {
 
   const handleCancelNavigation = () => {
     setShowNavigationModal(false)
+    // User chose to stay, do nothing
+  }
+
+  const handleConfirmLogoClick = () => {
+    // Log exam ID before clearing storage
+    console.log('=== LOGO CLICKED - NAVIGATION TO DASHBOARD ===')
+    console.log('Exam ID:', examId)
+    console.log('User navigated via logo without submitting')
+    console.log('=============================================')
+
+    // Set flag to allow navigation
+    isNavigatingAway.current = true
+
+    // Store finish time
+    sessionStorage.setItem('examFinishTime', new Date().toISOString())
+
+    // Close modal and navigate to dashboard
+    setShowLogoClickModal(false)
+    navigate('/dashboard')
+  }
+
+  const handleCancelLogoClick = () => {
+    setShowLogoClickModal(false)
     // User chose to stay, do nothing
   }
 
@@ -795,6 +829,17 @@ function Exam() {
         title="Rời khỏi trang thi"
         message="Bạn đang trong bài thi. Nếu rời khỏi trang này, tất cả câu trả lời của bạn sẽ bị mất. Bạn có chắc chắn muốn tiếp tục không?"
         confirmText="Rời khỏi"
+        cancelText="Ở lại"
+        confirmStyle="danger"
+      />
+
+      <ConfirmModal
+        isOpen={showLogoClickModal}
+        onClose={handleCancelLogoClick}
+        onConfirm={handleConfirmLogoClick}
+        title="Quay lại Dashboard"
+        message="Bạn đang trong bài thi. Nếu quay lại Dashboard, tất cả câu trả lời của bạn sẽ bị mất. Bạn có chắc chắn muốn tiếp tục không?"
+        confirmText="Quay lại"
         cancelText="Ở lại"
         confirmStyle="danger"
       />

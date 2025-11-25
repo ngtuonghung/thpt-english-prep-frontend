@@ -31,6 +31,7 @@ function Submission() {
   const [examFinishTime, setExamFinishTime] = useState(null)
   const [showBackModal, setShowBackModal] = useState(false)
   const [showNavigationModal, setShowNavigationModal] = useState(false)
+  const [showLogoClickModal, setShowLogoClickModal] = useState(false)
   const [fetchingFromDatabase, setFetchingFromDatabase] = useState(false)
   const isNavigatingAway = useRef(false)
   const hasFetchedFromDB = useRef(false)
@@ -348,6 +349,15 @@ function Submission() {
     // Intercept all link clicks to show custom modal
     const handleClick = (e) => {
       if (!isNavigatingAway.current) {
+        // Check if click is on logo
+        const logo = e.target.closest('.logo')
+        if (logo) {
+          e.preventDefault()
+          e.stopPropagation()
+          e.stopImmediatePropagation()
+          setShowLogoClickModal(true)
+          return
+        }
         const target = e.target.closest('a')
         if (target && target.href) {
           // Check if it's an external link or different page
@@ -824,6 +834,30 @@ function Submission() {
     // User chose to stay, do nothing
   }
 
+  const handleConfirmLogoClick = () => {
+    // Set flag to allow navigation
+    isNavigatingAway.current = true
+    
+    // Clear all exam and submission related storage
+    sessionStorage.removeItem('currentExam')
+    sessionStorage.removeItem('examAnswers')
+    sessionStorage.removeItem('examStartTime')
+    sessionStorage.removeItem('examFinishTime')
+    sessionStorage.removeItem('examTimeRemaining')
+    sessionStorage.removeItem('examStarted')
+    sessionStorage.removeItem('examDoing')
+    sessionStorage.removeItem('chatSessions')
+    
+    // Close modal and navigate to dashboard
+    setShowLogoClickModal(false)
+    navigate('/dashboard')
+  }
+
+  const handleCancelLogoClick = () => {
+    setShowLogoClickModal(false)
+    // User chose to stay, do nothing
+  }
+
   if (loading || !examData || !answers) {
     return (
       <div className="loading">
@@ -1092,6 +1126,17 @@ function Submission() {
         title="Rời khỏi trang"
         message="Lịch sử chat của bạn sẽ không được lưu nếu rời khỏi trang này. Bạn có chắc chắn muốn tiếp tục không?"
         confirmText="Rời khỏi"
+        cancelText="Ở lại"
+        confirmStyle="danger"
+      />
+
+      <ConfirmModal
+        isOpen={showLogoClickModal}
+        onClose={handleCancelLogoClick}
+        onConfirm={handleConfirmLogoClick}
+        title="Quay lại Dashboard"
+        message="Lịch sử chat của bạn sẽ không được lưu nếu quay lại Dashboard. Bạn có chắc chắn muốn tiếp tục không?"
+        confirmText="Quay lại"
         cancelText="Ở lại"
         confirmStyle="danger"
       />
