@@ -117,11 +117,20 @@ export default function ReviewQuiz() {
         ...aiConfig
       }
 
+      const savedUser = localStorage.getItem('user')
+      const idToken = savedUser ? JSON.parse(savedUser).id_token : null
+
+      const headers = {
+        'Content-Type': 'application/json'
+      }
+
+      if (idToken) {
+        headers['Authorization'] = idToken
+      }
+
       const response = await fetch(GEN_EXAM_API, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: headers,
         body: JSON.stringify(payload)
       })
 
