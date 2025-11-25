@@ -1292,3 +1292,12 @@
              newMessagePulse 1s ease-out 0.35s;
 }
 
+/* Spinner animation for loading overlay */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

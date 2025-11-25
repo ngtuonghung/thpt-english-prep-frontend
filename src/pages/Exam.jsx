@@ -450,7 +450,7 @@ function Exam() {
         },
         body: JSON.stringify({
           user_id: userInfo.sub,
-          examData,
+          exam_id: examId,
           answers,
           examStartTime,
         }),
@@ -492,7 +492,7 @@ function Exam() {
     }
   }
 
-  const handleExitClick = () => {
+  const handleExitClick = () => {2
     setShowExitModal(true)
   }
 

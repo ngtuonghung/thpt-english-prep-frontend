@@ -31,12 +31,70 @@ function Submission() {
   const [examFinishTime, setExamFinishTime] = useState(null)
   const [showBackModal, setShowBackModal] = useState(false)
   const [showNavigationModal, setShowNavigationModal] = useState(false)
+  const [fetchingFromDatabase, setFetchingFromDatabase] = useState(false)
   const isNavigatingAway = useRef(false)
+  const hasFetchedFromDB = useRef(false)
+
+  // Helper function to reconstruct examData structure from fetched questions
+  const reconstructExamData = useCallback((questions, question_ids, quiz_id) => {
+    // Group questions by type
+    const fill_short = []
+    const fill_long = []
+    const reading = []
+    const reorder_questions = []
+
+    // Create a map of group_id to question object
+    const questionMap = {}
+    questions.forEach(q => {
+      questionMap[q.id] = q
+    })
+
+    // Process question_ids in order to maintain sequence
+    question_ids.forEach(qid => {
+      const [group_id_str] = qid.split('-')
+      const group_id = parseInt(group_id_str)
+      
+      if (questionMap[group_id]) {
+        const question = questionMap[group_id]
+        const type = question.question_type
+        
+        // Add to appropriate array based on type
+        if (type === 'fill_short' && !fill_short.find(q => q.id === group_id)) {
+          fill_short.push(question)
+        } else if (type === 'fill_long' && !fill_long.find(q => q.id === group_id)) {
+          fill_long.push(question)
+        } else if (type === 'reading' && !reading.find(q => q.id === group_id)) {
+          reading.push(question)
+        } else if (type === 'reorder' && !reorder_questions.find(q => q.id === group_id)) {
+          reorder_questions.push(question)
+        }
+      }
+    })
+
+    return {
+      quiz_id,
+      groups: {
+        fill_short,
+        fill_long,
+        reading
+      },
+      reorder_questions
+    }
+  }, [])
 
   // Function to fetch exam data from database
-  const fetchExamFromDatabase = async (examId, user) => {
+  const fetchExamFromDatabase = useCallback(async (examId, user) => {
+    // Prevent multiple fetches
+    if (hasFetchedFromDB.current) return
+    hasFetchedFromDB.current = true
+    
+    setFetchingFromDatabase(true)
+    setLoading(true)
+    
     try {
       console.log(`Fetching exam ${examId} from database...`)
+      
+      // Fetch exam submission data (Lambda will fetch questions automatically)
       const response = await fetch(`${API_BASE}/submission?id=${examId}`, {
         headers: {
           'Authorization': `Bearer ${user.id_token}`
@@ -45,21 +103,55 @@ function Submission() {
 
       if (!response.ok) {
         console.error('Failed to fetch exam from database:', response.status)
-        navigate('/dashboard')
+        setFetchingFromDatabase(false)
+        setLoading(false)
         return
       }
 
       const data = await response.json()
-      console.log('Fetched exam data:', data)
+      console.log('Fetched exam data from database:', data)
 
-      // TODO: Process and set the fetched data
-      // For now, redirect to dashboard since backend doesn't return full exam data yet
-      navigate('/dashboard')
+      const { question_ids, exam_info, user_answers, questions } = data
+
+      if (!question_ids || question_ids.length === 0) {
+        console.error('No question IDs found in exam data')
+        setFetchingFromDatabase(false)
+        setLoading(false)
+        return
+      }
+
+      if (!questions || questions.length === 0) {
+        console.error('No questions data returned from database')
+        setFetchingFromDatabase(false)
+        setLoading(false)
+        return
+      }
+
+      // Reconstruct examData structure from fetched questions
+      const reconstructedExamData = reconstructExamData(
+        questions,
+        question_ids,
+        examId
+      )
+
+      console.log('Reconstructed exam data:', reconstructedExamData)
+
+      // Set all state with fetched data
+      setExamData(reconstructedExamData)
+      setAnswers(user_answers || {})
+      setExamStartTime(new Date(exam_info.exam_start_time))
+      setExamFinishTime(new Date(exam_info.exam_finish_time))
+      
+      console.log('Successfully reconstructed exam from database')
+      setFetchingFromDatabase(false)
+      setLoading(false)
+
     } catch (error) {
       console.error('Error fetching exam from database:', error)
-      navigate('/dashboard')
+      setFetchingFromDatabase(false)
+      setLoading(false)
     }
-  }
+  }, [reconstructExamData])
 
   // Save model preference to localStorage
   useEffect(() => {
@@ -76,100 +168,104 @@ function Submission() {
       if (savedUserInfo) {
         setUserInfo(JSON.parse(savedUserInfo))
       }
-    }
 
-    // Get exam ID from URL
-    const urlExamId = searchParams.get('id')
+      // Get exam ID from URL
+      const urlExamId = searchParams.get('id')
 
-    // Redirect if no exam ID in URL
-    if (!urlExamId) {
-      console.warn('No exam ID in URL parameter')
-      navigate('/dashboard')
-      return
-    }
-
-    // Load from sessionStorage
-    const savedExam = sessionStorage.getItem('currentExam');
-    const savedAnswers = sessionStorage.getItem('examAnswers');
-    const savedStartTime = sessionStorage.getItem('examStartTime');
-    const savedFinishTime = sessionStorage.getItem('examFinishTime');
-
-    // Check for missing fields
-    const missingFields = []
-    if (!savedExam) missingFields.push('currentExam')
-    if (!savedAnswers) missingFields.push('examAnswers')
-    if (!savedStartTime) missingFields.push('examStartTime')
-    if (!savedFinishTime) missingFields.push('examFinishTime')
-
-    // If any field is missing, fetch from database
-    if (missingFields.length > 0) {
-      console.log('=== Missing sessionStorage fields ===')
-      console.log('Missing:', missingFields.join(', '))
-      console.log('Exam ID from URL:', urlExamId)
-      console.log('Fetching from database...')
-      console.log('====================================')
-      
-      // Fetch exam data from database
-      fetchExamFromDatabase(urlExamId, parsedUser)
-      return
-    }
-
-    try {
-      const parsedExam = JSON.parse(savedExam);
-      
-      // Verify exam ID matches URL parameter
-      if (urlExamId && parsedExam.id.toString() !== urlExamId) {
-        console.warn('Exam ID mismatch')
-        navigate('/dashboard')
+      // If no exam ID in URL, just keep loading
+      if (!urlExamId) {
+        console.warn('No exam ID in URL parameter')
+        setLoading(false)
         return
       }
 
-      setExamData(parsedExam.data);
-      setAnswers(JSON.parse(savedAnswers));
-      if (savedStartTime) {
-        setExamStartTime(new Date(savedStartTime));
-      }
-      if (savedFinishTime) {
-        setExamFinishTime(new Date(savedFinishTime));
-      } else {
-        // Fallback: Set finish time to now if not stored
-        setExamFinishTime(new Date());
+      // Load from sessionStorage
+      const savedExam = sessionStorage.getItem('currentExam');
+      const savedAnswers = sessionStorage.getItem('examAnswers');
+      const savedStartTime = sessionStorage.getItem('examStartTime');
+      const savedFinishTime = sessionStorage.getItem('examFinishTime');
+
+      // Check for missing fields
+      const missingFields = []
+      if (!savedExam) missingFields.push('currentExam')
+      if (!savedAnswers) missingFields.push('examAnswers')
+      if (!savedStartTime) missingFields.push('examStartTime')
+      if (!savedFinishTime) missingFields.push('examFinishTime')
+
+      // If any field is missing, fetch from database
+      if (missingFields.length > 0) {
+        console.log('=== Missing sessionStorage fields ===')
+        console.log('Missing:', missingFields.join(', '))
+        console.log('Exam ID from URL:', urlExamId)
+        console.log('Fetching from database...')
+        console.log('====================================')
+        
+        // Fetch exam data from database (don't set loading to false here)
+        fetchExamFromDatabase(urlExamId, parsedUser)
+        // Return early - fetchExamFromDatabase will handle loading state
+        return
       }
 
-      // Load chat sessions from sessionStorage
-      const savedChatSessions = sessionStorage.getItem('chatSessions');
-      if (savedChatSessions) {
-        try {
-          const parsedSessions = JSON.parse(savedChatSessions);
-          // Convert timestamp strings back to Date objects and regenerate IDs if needed
-          Object.keys(parsedSessions).forEach(questionId => {
-            parsedSessions[questionId].messages = parsedSessions[questionId].messages.map((msg, idx) => {
-              // Regenerate ID if it's in old format (numeric or doesn't have prefix)
-              const needsNewId = typeof msg.id === 'number' || !msg.id.toString().includes('-');
-              const newId = needsNewId 
-                ? `${msg.sender}-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 9)}`
-                : msg.id;
-              
-              return {
-                ...msg,
-                id: newId,
-                timestamp: new Date(msg.timestamp)
-              };
-            });
-          });
-          setChatSessions(parsedSessions);
-        } catch (error) {
-          console.error('Failed to parse chat sessions from session storage', error);
+      try {
+        const parsedExam = JSON.parse(savedExam);
+      
+        // Verify exam ID matches URL parameter
+        if (urlExamId && parsedExam.id.toString() !== urlExamId) {
+          console.warn('Exam ID mismatch')
+          setLoading(false)
+          return
         }
+
+        setExamData(parsedExam.data);
+        setAnswers(JSON.parse(savedAnswers));
+        if (savedStartTime) {
+          setExamStartTime(new Date(savedStartTime));
+        }
+        if (savedFinishTime) {
+          setExamFinishTime(new Date(savedFinishTime));
+        } else {
+          // Fallback: Set finish time to now if not stored
+          setExamFinishTime(new Date());
+        }
+
+        // Load chat sessions from sessionStorage
+        const savedChatSessions = sessionStorage.getItem('chatSessions');
+        if (savedChatSessions) {
+          try {
+            const parsedSessions = JSON.parse(savedChatSessions);
+            // Convert timestamp strings back to Date objects and regenerate IDs if needed
+            Object.keys(parsedSessions).forEach(questionId => {
+              parsedSessions[questionId].messages = parsedSessions[questionId].messages.map((msg, idx) => {
+                // Regenerate ID if it's in old format (numeric or doesn't have prefix)
+                const needsNewId = typeof msg.id === 'number' || !msg.id.toString().includes('-');
+                const newId = needsNewId 
+                  ? `${msg.sender}-${Date.now()}-${idx}-${Math.random().toString(36).substr(2, 9)}`
+                  : msg.id;
+                
+                return {
+                  ...msg,
+                  id: newId,
+                  timestamp: new Date(msg.timestamp)
+                };
+              });
+            });
+            setChatSessions(parsedSessions);
+          } catch (error) {
+            console.error('Failed to parse chat sessions from session storage', error);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to parse exam/answer data from session storage", error);
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error("Failed to parse exam/answer data from session storage", error);
-      navigate('/dashboard');
-      return;
+      
+      setLoading(false)
+    } else {
+      // No user found, just keep loading false
+      setLoading(false)
     }
-    
-    setLoading(false)
-  }, [navigate, searchParams])
+  }, [searchParams, fetchExamFromDatabase])
 
 
   // Auto-scroll chat messages to bottom only when messages change
@@ -735,6 +831,43 @@ function Submission() {
 
   return (
     <div className="submission-page">
+      {/* Loading overlay when fetching from database */}
+      {fetchingFromDatabase && (
+        <div className="loading-overlay" style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10000
+        }}>
+          <div className="spinner" style={{
+            width: '60px',
+            height: '60px',
+            border: '6px solid rgba(255, 255, 255, 0.2)',
+            borderTop: '6px solid white',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+          }}></div>
+          <p style={{
+            color: 'white',
+            fontSize: '18px',
+            marginTop: '20px',
+            fontWeight: '500'
+          }}>Đang tải dữ liệu từ cơ sở dữ liệu...</p>
+          <p style={{
+            color: 'rgba(255, 255, 255, 0.8)',
+            fontSize: '14px',
+            marginTop: '10px'
+          }}>Vui lòng đợi trong giây lát</p>
+        </div>
+      )}
+
       <TopBar userInfo={userInfo} />
 
       <main className="submission-main">
